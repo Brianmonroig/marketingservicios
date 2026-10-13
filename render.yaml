@@ -1,0 +1,67 @@
+# Blueprint de Render. Plan gratuito, región Fráncfort (la más cercana a España).
+# El Postgres gratuito caduca a los 30 días y no tiene copias de seguridad.
+# Documentación: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: crm-db
+    databaseName: crm
+    user: crm
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+    connectionPool: none
+
+services:
+  - type: web
+    name: crm-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /health
+    buildCommand: npm install -g pnpm@10.34.7 && pnpm install --frozen-lockfile && pnpm --filter @crm/shared build && pnpm --filter @crm/api lint
+    preDeployCommand: ./node_modules/.bin/pnpm --filter @crm/api db:migrate
+    startCommand: ./node_modules/.bin/pnpm --filter @crm/api start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: crm-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+
+  - type: web
+    name: crm-web
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm install -g pnpm@10.34.7 && pnpm install --frozen-lockfile && pnpm --filter @crm/shared build && pnpm --filter @crm/web build
+    startCommand: ./node_modules/.bin/pnpm --filter @crm/web start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      - key: AUTH_URL
+        fromService:
+          name: crm-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: API_URL
+        fromService:
+          name: crm-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
