@@ -53,6 +53,9 @@ services:
         sync: false
       - key: META_WEBHOOK_VERIFY_TOKEN
         generateValue: true
+      # Código fijo de acceso (sin correo). Quitar o vaciar cuando haya un servicio de email real.
+      - key: AUTH_GENERIC_CODE
+        value: abc123
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM

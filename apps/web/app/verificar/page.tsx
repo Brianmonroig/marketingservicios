@@ -19,10 +19,15 @@ export default function VerifyPage() {
       <h1>
         Confirma tu <em>correo</em>.
       </h1>
-      <p className="lead">Escribe el código de 6 números que acabamos de enviar. Caduca en 10 minutos.</p>
+      <p className="lead">
+        Por ahora el código de acceso es <strong className="mono">abc123</strong> (también vale con espacio: abc 123). Úsalo para confirmar el correo y para entrar.
+      </p>
       <form action={action} className="form">
+        <Field label="Correo" htmlFor="email">
+          <Input id="email" name="email" type="email" autoComplete="email" required />
+        </Field>
         <Field label="Código" htmlFor="code">
-          <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
+          <Input id="code" name="code" autoComplete="one-time-code" required placeholder="abc123" />
         </Field>
         {state.error ? <p className="msg-error">{state.error}</p> : null}
         <Button type="submit" size="block" disabled={pending}>

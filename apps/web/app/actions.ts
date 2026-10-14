@@ -43,7 +43,8 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
 
 export async function verifyEmailAction(_state: FormState, formData: FormData): Promise<FormState> {
   const jar = await cookies();
-  const email = jar.get("crm_pending_verify")?.value ?? "";
+  const fromForm = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = fromForm || jar.get("crm_pending_verify")?.value || "";
   const result = await post("/auth/verify-email", { email, code: formData.get("code") });
   if (result.error) return { error: result.error };
   jar.delete("crm_pending_verify");

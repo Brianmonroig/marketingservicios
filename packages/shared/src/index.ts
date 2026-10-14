@@ -24,9 +24,16 @@ export const registerSchema = z.object({
   password: passwordSchema,
 });
 
+// 6 dígitos normales, o el código genérico de entorno (letras/números, espacios opcionales).
+const authCodeSchema = z
+  .string()
+  .trim()
+  .min(4, "El código es demasiado corto")
+  .max(32, "El código es demasiado largo");
+
 export const verifyEmailSchema = z.object({
   email: emailSchema,
-  code: z.string().regex(/^\d{6}$/, "El código tiene 6 números"),
+  code: authCodeSchema,
 });
 
 export const loginSchema = z.object({
@@ -37,7 +44,7 @@ export const loginSchema = z.object({
 export const verifyTwoFactorSchema = z.object({
   email: emailSchema,
   challengeId: z.string().uuid(),
-  code: z.string().regex(/^\d{6}$/, "El código tiene 6 números"),
+  code: authCodeSchema,
 });
 
 export const resendCodeSchema = z.object({

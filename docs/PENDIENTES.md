@@ -1,10 +1,15 @@
 # Pendiente de acción manual o de fases posteriores
 
-## Para que el registro envíe correos en Render
+## Acceso sin correo (activo ahora)
 
-- Crear una cuenta en Resend y verificar un remitente (o elegir otro servicio de correo).
-- Poner `RESEND_API_KEY` y `RESEND_FROM` en el servicio `crm-api`.
-- Sin esas dos variables, el API de producción rechaza el envío. No finge que el correo salió. **Mientras no exista, nadie puede registrarse ni entrar en producción.**
+- En Render, `AUTH_GENERIC_CODE=abc123`. Ese código vale para confirmar el correo y para el segundo paso de entrada. También acepta `abc 123`.
+- Mientras exista esa variable, **no se envía ningún correo** (Resend se ignora).
+- Es inseguro: cualquiera que sepa un correo registrado y el código genérico puede entrar al segundo paso tras la contraseña. Quitar `AUTH_GENERIC_CODE` cuando haya un envío de correo real.
+
+## Para enviar códigos por correo de verdad
+
+- Crear cuenta en un servicio de correo (Resend, Brevo, etc.), verificar remitente, poner las claves en `crm-api` y **vaciar o borrar** `AUTH_GENERIC_CODE`.
+- En Render el SMTP clásico está bloqueado en el plan gratuito; hace falta una API de correo.
 
 ## Para que lleguen leads y mensajes reales (fases 2 y 3)
 

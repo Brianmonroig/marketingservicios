@@ -116,7 +116,28 @@ async function storeCode(tx: Transaction, input: { tenantId: string; userId: str
   return challengeId;
 }
 
+function normalizeAuthCode(code: string): string {
+  return code.replace(/\s+/g, "").toLowerCase();
+}
+
+/** Código fijo de acceso (AUTH_GENERIC_CODE). Pensado para arrancar sin servicio de correo. */
+export function genericAuthCode(): string | null {
+  const raw = process.env.AUTH_GENERIC_CODE?.trim();
+  if (!raw) return null;
+  return normalizeAuthCode(raw);
+}
+
+function matchesGenericCode(code: string): boolean {
+  const expected = genericAuthCode();
+  return expected !== null && normalizeAuthCode(code) === expected;
+}
+
 async function sendCode(mailer: Mailer, input: { to: string; code: string; purpose: MailPurpose }) {
+  // Con código genérico no hace falta correo: el usuario usa AUTH_GENERIC_CODE.
+  if (genericAuthCode()) {
+    console.info(`[auth] código genérico activo; no se envía correo (${input.purpose} → ${input.to})`);
+    return;
+  }
   try {
     await mailer.sendVerificationCode(input);
   } catch (error) {
@@ -197,6 +218,14 @@ async function consumeCode(tx: Transaction, input: { userId: string; purpose: Ma
     .orderBy(desc(emailChallenges.createdAt))
     .limit(1);
 
+  if (matchesGenericCode(input.code)) {
+    if (challenge) {
+      await tx.update(emailChallenges).set({ consumedAt: new Date() }).where(eq(emailChallenges.id, challenge.id));
+      return challenge.id;
+    }
+    return "generic";
+  }
+
   if (!challenge || challenge.expiresAt.getTime() < Date.now()) {
     throw new HttpError("El código es incorrecto o ya caducó", 401);
   }
@@ -253,9 +282,9 @@ export async function completeLogin(
     if (!challenge || challenge.purpose !== "login_2fa" || challenge.consumedAt || challenge.expiresAt.getTime() < Date.now()) {
       throw new HttpError("El código es incorrecto o ya caducó", 401);
     }
-    if (!codesMatch(challenge.codeHash, hashCode(input.code, pepper()))) {
-      throw new HttpError("El código es incorrecto o ya caducó", 401);
-    }
+    const ok =
+      matchesGenericCode(input.code) || codesMatch(challenge.codeHash, hashCode(input.code, pepper()));
+    if (!ok) throw new HttpError("El código es incorrecto o ya caducó", 401);
     await tx.update(emailChallenges).set({ consumedAt: new Date() }).where(eq(emailChallenges.id, challenge.id));
     const name = await agencyName(tx, user.tenantId);
     return toPublic(user, name);

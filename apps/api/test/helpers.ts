@@ -22,6 +22,8 @@ export function prepareEnv() {
   process.env.META_WEBHOOK_VERIFY_TOKEN = VERIFY_TOKEN;
   process.env.WEB_ORIGIN = "http://localhost:3000";
   process.env.QUEUE_BACKOFF_MS = "100";
+  // Los tests de correo usan el mock; el código genérico se prueba aparte.
+  delete process.env.AUTH_GENERIC_CODE;
 }
 
 export type Running = { app: FastifyInstance; base: string; meta: MetaMock };

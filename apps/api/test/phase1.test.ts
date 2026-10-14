@@ -201,3 +201,42 @@ test("un tenant no lee chunks ni leads de otro, ni por API ni por SQL", async ()
 
   await app.close();
 });
+
+test("el código genérico confirma el correo y permite entrar sin enviar email", async () => {
+  if (!databaseUrl) throw new Error("Falta DATABASE_URL");
+  process.env.AUTH_GENERIC_CODE = "abc 123";
+  sentMessages.length = 0;
+  const app = await buildApp({ databaseUrl, mailer: createMockMailer() });
+  const base = await listen(app);
+  const email = `generic-${randomUUID()}@example.com`;
+
+  const registered = await request(base, "/auth/register", {
+    method: "POST",
+    body: { agencyName: "Agencia genérica", name: "Dueño", email, password: "password123" },
+  });
+  expect(registered.status).toBe(202);
+  expect(sentMessages.filter((message) => message.to === email)).toHaveLength(0);
+
+  const verified = await request(base, "/auth/verify-email", {
+    method: "POST",
+    body: { email, code: "abc123" },
+  });
+  expect(verified.status).toBe(200);
+
+  const login = await request(base, "/auth/login", {
+    method: "POST",
+    body: { email, password: "password123" },
+  });
+  expect(login.status).toBe(200);
+  expect(login.data.challengeId).toBeTruthy();
+
+  const session = await request(base, "/auth/verify-2fa", {
+    method: "POST",
+    body: { email, challengeId: login.data.challengeId, code: "abc 123" },
+  });
+  expect(session.status).toBe(200);
+  expect(session.data.token).toBeTruthy();
+
+  delete process.env.AUTH_GENERIC_CODE;
+  await app.close();
+});

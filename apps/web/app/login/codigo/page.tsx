@@ -19,10 +19,12 @@ export default function TwoFactorPage() {
       <h1>
         Código de <em>entrada</em>.
       </h1>
-      <p className="lead">Te lo enviamos al correo para confirmar que eres tú.</p>
+      <p className="lead">
+        Escribe <strong className="mono">abc123</strong> para entrar. (También vale abc 123.)
+      </p>
       <form action={action} className="form">
         <Field label="Código" htmlFor="code">
-          <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
+          <Input id="code" name="code" autoComplete="one-time-code" required placeholder="abc123" />
         </Field>
         {state.error ? <p className="msg-error">{state.error}</p> : null}
         <Button type="submit" size="block" disabled={pending}>
