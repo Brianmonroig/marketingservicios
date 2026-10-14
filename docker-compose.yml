@@ -50,6 +50,10 @@ services:
       DATABASE_URL: postgres://app_user:app_user@postgres:5432/crm
       JWT_SECRET: dev-only-change-me-please-32chars
       TOKEN_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      REDIS_URL: redis://redis:6379
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN:-}
       WEB_ORIGIN: http://localhost:3000
       PORT: "3001"
       NODE_ENV: development
@@ -58,6 +62,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   web:
     build:

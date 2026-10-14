@@ -1,6 +1,6 @@
 # Marketing Servicios Local
 
-CRM para agencias que venden marketing a negocios de servicios a domicilio. Esta entrega es la fase 1: el espacio de cada agencia, el registro y la entrada con un código al correo.
+CRM para agencias que venden marketing a negocios de servicios a domicilio. Esta entrega es el MVP (fases 1 a 3): el espacio de cada agencia con registro y entrada por código al correo, la recepción de leads de Meta Lead Ads y WhatsApp con inbox en tiempo real. El diseño sigue la marca North Scale.
 
 ## Qué hay en marcha
 
@@ -9,10 +9,14 @@ CRM para agencias que venden marketing a negocios de servicios a domicilio. Esta
 - El dueño o un administrador pueden crear más personas dentro de la misma agencia. Cada persona confirma su correo y, al entrar, recibe otro código.
 - Un agente no puede abrir la sección del equipo.
 - Los datos de una agencia no se pueden leer desde otra. Eso incluye los fragmentos de documentos.
+- **Leads de Meta:** se conecta la página de Facebook por OAuth y, al activarla, Meta avisa de cada lead por webhook. El aviso se guarda primero y se procesa en una cola (Redis), así que no se pierde si el proceso falla.
+- **WhatsApp:** se conecta el número de la Cloud API a mano. Los mensajes entrantes crean el lead y la conversación. Los envíos salen por la cola con reintentos y muestran su estado (enviado, entregado, leído, fallido).
+- **Regla de 24 h:** el texto libre solo sale si el lead escribió hace menos de 24 h. Después, solo plantillas aprobadas y solo a leads con permiso de WhatsApp registrado.
+- **Inbox en tiempo real** por SSE, con la ficha del lead al lado.
 
 ## En tu ordenador
 
-Hace falta Node 22, pnpm y Docker.
+Hace falta Node 22, pnpm y Docker (Postgres con pgvector y Redis).
 
 ```bash
 cp .env.example .env
@@ -21,7 +25,9 @@ docker compose up
 
 La web queda en http://localhost:3000 y el API en http://localhost:3001.
 
-Sin Docker, los tests usan Postgres 16 con la extensión `vector`.
+Sin Docker, los tests usan Postgres con la extensión `vector` y un Redis (`REDIS_URL`).
+
+Para probar Meta de verdad hace falta una app de Meta: mira `docs/PENDIENTES.md`.
 
 ## En Render
 
@@ -43,13 +49,15 @@ Resend es el servicio que manda los códigos. El plan gratuito de Render bloquea
 - El Postgres se apaga a los 30 días. Después hay 14 días para pasarlo a un plan de pago. Si no, Render borra los datos. No hace copias de seguridad.
 - La web y el API se duermen si nadie entra en 15 minutos. La primera visita después de eso tarda en responder.
 - Hay 750 horas gratis al mes para todo el espacio de trabajo.
-- Redis y la carpeta de archivos no están en Render en esta fase. Están en Docker, en tu ordenador, para las fases siguientes.
+- Redis (Key Value) gratuito no guarda datos en disco. Si se reinicia, se pierde la cola; los avisos de Meta se reprocesan desde Postgres.
+- El worker de la cola corre dentro del API (el plan gratuito no tiene workers).
+- La carpeta de archivos no está en Render todavía (fase 4).
 
 ## Decisiones de esta fase
 
-- Tiempo real del inbox, cuando llegue la fase 3: SSE. Es un canal en la misma página web y encaja con un solo servidor pequeño. Todavía no está construido.
+- Tiempo real del inbox: SSE sobre Redis pub/sub. Es un canal en la misma página web y encaja con un solo servidor pequeño.
 - Los archivos de las agencias (PDF y propuestas) irán a una carpeta en la nube compatible con S3. En tu ordenador esa carpeta es MinIO. En Render todavía no hay carpeta, porque los documentos llegan en la fase 4.
 - `webhook_events.tenant_id` puede quedar vacío. El aviso de Meta llega antes de saber qué agencia es. Una agencia no puede leer avisos de otra ni avisos sin agencia.
 - Un lead puede nacer de Meta o crearse a mano. El identificador de Meta es obligatorio solo cuando viene de un anuncio.
-- El consentimiento de WhatsApp saldrá de un campo del formulario de Meta. Esa conexión es la fase 2.
+- El consentimiento de WhatsApp se registra a mano en la ficha del lead, con fecha y origen.
 - Los modelos de IA se eligen en la fase 5, contra la documentación vigente. Esta fase no llama a ningún modelo.

@@ -1,12 +1,11 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createTeamMemberAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input, Select } from "@/components/ui/input";
+import { Field } from "@/components/ui/label";
 
 export function TeamForm() {
   const [state, action, pending] = useActionState(createTeamMemberAction, {});
@@ -17,35 +16,32 @@ export function TeamForm() {
   }, [state.ok, router]);
 
   return (
-    <form action={action} className="mt-8 grid gap-4 rounded-lg border border-line bg-white p-6">
-      <h2 className="text-lg font-semibold">Añadir persona</h2>
-      <div className="space-y-2">
-        <Label htmlFor="name">Nombre</Label>
-        <Input id="name" name="name" required />
+    <form action={action} className="form" style={{ marginTop: "1.4rem", maxWidth: 640 }}>
+      <h2 style={{ fontSize: "1.25rem" }}>Añadir persona</h2>
+      <div className="form-row">
+        <Field label="Nombre" htmlFor="name">
+          <Input id="name" name="name" required />
+        </Field>
+        <Field label="Correo" htmlFor="email">
+          <Input id="email" name="email" type="email" required />
+        </Field>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="email">Correo</Label>
-        <Input id="email" name="email" type="email" required />
+      <div className="form-row">
+        <Field label="Contraseña inicial" htmlFor="password">
+          <Input id="password" name="password" type="password" autoComplete="new-password" required />
+        </Field>
+        <Field label="Papel" htmlFor="role">
+          <Select id="role" name="role" defaultValue="agent">
+            <option value="agent">Agente</option>
+            <option value="admin">Administrador</option>
+          </Select>
+        </Field>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Contraseña inicial</Label>
-        <Input id="password" name="password" type="password" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="role">Papel</Label>
-        <select id="role" name="role" className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm">
-          <option value="agent">Agente</option>
-          <option value="admin">Administrador</option>
-        </select>
-      </div>
-      {state.error ? <p className="text-sm text-red-700">{state.error}</p> : null}
-      {state.ok ? <p className="text-sm text-pine">Persona creada. Tiene que confirmar su correo.</p> : null}
+      {state.error ? <p className="msg-error">{state.error}</p> : null}
+      {state.ok ? <p className="msg-ok">Persona creada. Tiene que confirmar su correo.</p> : null}
       <Button type="submit" disabled={pending}>
-        {pending ? "Guardando..." : "Crear persona"}
+        {pending ? "Guardando…" : "Crear persona"}
       </Button>
-      <Link href="/app" className="text-sm text-pine">
-        Volver
-      </Link>
     </form>
   );
 }

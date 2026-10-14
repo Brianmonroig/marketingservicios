@@ -8,6 +8,10 @@ if (!databaseUrl || !migrateUrl) {
 }
 
 await migrate(migrateUrl);
-const app = await buildApp({ databaseUrl });
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) {
+  console.warn("Falta REDIS_URL: los webhooks de Meta y el envío de WhatsApp quedan desactivados.");
+}
+const app = await buildApp({ databaseUrl, redisUrl, runWorkers: true });
 const port = Number(process.env.PORT ?? 3001);
 await app.listen({ port, host: "0.0.0.0" });

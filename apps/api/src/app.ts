@@ -9,13 +9,29 @@ import {
   verifyTwoFactorSchema,
 } from "@crm/shared";
 import { ZodError } from "zod";
-import { completeLogin, createTeamUser, HttpError, listUsers, readToken, registerAccount, resendCode, startLogin, verifyEmail } from "./accounts.js";
+import { completeLogin, createTeamUser, HttpError, listUsers, registerAccount, resendCode, startLogin, verifyEmail } from "./accounts.js";
 import { createDatabase, type Database } from "./db.js";
+import type { Deps } from "./deps.js";
+import { requireManager, requireUser } from "./guard.js";
+import { processWebhookEvent, sweepWebhookEvents } from "./ingest.js";
 import { createMailer, type Mailer } from "./mailer.js";
+import { createHttpMetaClient, MetaApiError, type MetaClient } from "./meta.js";
+import { sendQueuedMessage } from "./outbound.js";
+import { createJobQueue } from "./queues.js";
+import { createNoopRealtime, createRedisRealtime } from "./realtime.js";
+import { registerCrmRoutes } from "./routes/crm.js";
+import { registerIntegrationRoutes } from "./routes/integrations.js";
+import { registerWebhookRoutes } from "./routes/webhooks.js";
 
 export type AppOptions = {
   databaseUrl: string;
   mailer?: Mailer;
+  meta?: MetaClient;
+  // Sin redisUrl no hay colas ni tiempo real: los webhooks responden 503.
+  redisUrl?: string;
+  queuePrefix?: string;
+  // El worker corre dentro del proceso del API porque el plan gratuito de Render no tiene workers.
+  runWorkers?: boolean;
 };
 
 export async function buildApp(options: AppOptions) {
@@ -30,8 +46,37 @@ export async function buildApp(options: AppOptions) {
     },
   });
 
+  const queue = options.redisUrl ? createJobQueue({ redisUrl: options.redisUrl, prefix: options.queuePrefix }) : null;
+  const realtime = options.redisUrl ? createRedisRealtime(options.redisUrl) : createNoopRealtime();
+  const deps: Deps = { db, meta: options.meta ?? createHttpMetaClient(), queue, realtime };
+
   app.decorate("db", db);
+  app.decorate("deps", deps);
+
+  let sweeper: NodeJS.Timeout | undefined;
+  if (queue && options.runWorkers) {
+    queue.startWorkers({
+      webhook: (id, final) => processWebhookEvent(deps, id, final),
+      send: (data, final) => sendQueuedMessage(deps, data, final),
+    });
+    if (process.env.NODE_ENV !== "test") {
+      sweeper = setInterval(() => {
+        void (async () => {
+          try {
+            const requeued = await sweepWebhookEvents(deps);
+            app.log.info({ requeued, queues: await queue.counts() }, "Métricas de colas");
+          } catch (error) {
+            app.log.warn({ err: error }, "Falló el barrido de eventos pendientes");
+          }
+        })();
+      }, 60_000);
+    }
+  }
+
   app.addHook("onClose", async () => {
+    if (sweeper) clearInterval(sweeper);
+    await queue?.close();
+    await realtime.close();
     await pool.end();
   });
 
@@ -48,7 +93,11 @@ export async function buildApp(options: AppOptions) {
       return reply.code(400).send({ error: error.issues[0]?.message ?? "Datos no válidos" });
     }
     if (error instanceof HttpError) {
-      return reply.code(error.status).send({ error: error.message });
+      return reply.code(error.status).send({ error: error.message, ...(error.code ? { code: error.code } : {}) });
+    }
+    if (error instanceof MetaApiError) {
+      const status = error.status === 503 ? 503 : error.status === 0 || error.status >= 500 ? 502 : 400;
+      return reply.code(status).send({ error: error.message });
     }
     request.log.error(error);
     return reply.code(500).send({ error: "Error interno" });
@@ -93,35 +142,28 @@ export async function buildApp(options: AppOptions) {
     return { user };
   });
 
-  app.get("/admin/users", async (request, reply) => {
-    const user = await requireUser(request.headers.authorization);
-    if (user.role === "agent") {
-      return reply.code(403).send({ error: "No tienes permiso para esta sección" });
-    }
+  app.get("/admin/users", async (request) => {
+    const user = await requireManager(request.headers.authorization);
     return { users: await listUsers(app.db, user) };
   });
 
   app.post("/admin/users", async (request, reply) => {
-    const user = await requireUser(request.headers.authorization);
-    if (user.role === "agent") {
-      return reply.code(403).send({ error: "No tienes permiso para esta sección" });
-    }
+    const user = await requireManager(request.headers.authorization);
     const body = createUserSchema.parse(request.body);
     await createTeamUser(app.db, mailer, user, body);
     return reply.code(201).send({ ok: true });
   });
 
-  return app;
-}
+  await registerWebhookRoutes(app, deps);
+  await registerIntegrationRoutes(app, deps);
+  await registerCrmRoutes(app, deps);
 
-async function requireUser(authorization: string | undefined) {
-  const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!token) throw new HttpError("Tienes que entrar para continuar", 401);
-  return readToken(token);
+  return app;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     db: Database;
+    deps: Deps;
   }
 }

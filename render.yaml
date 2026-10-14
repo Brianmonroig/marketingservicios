@@ -12,6 +12,16 @@ databases:
     connectionPool: none
 
 services:
+  # Redis (Key Value) para la cola de trabajos y el inbox en tiempo real.
+  # El plan gratuito no guarda datos en disco: si se reinicia, se pierde la cola.
+  # Los webhooks recibidos están en Postgres y un barrido cada minuto los reprocesa.
+  - type: keyvalue
+    name: crm-redis
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
   - type: web
     name: crm-api
     runtime: node
@@ -31,6 +41,17 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: crm-redis
+          property: connectionString
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_WEBHOOK_VERIFY_TOKEN
         generateValue: true
       - key: RESEND_API_KEY
         sync: false

@@ -96,3 +96,64 @@ export const documentChunks = pgTable("document_chunks", {
   metadata: jsonb("metadata").notNull().default({}),
   ...timestamps,
 });
+
+export const integrations = pgTable("integrations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  provider: text("provider").notNull(),
+  externalAccountId: text("external_account_id").notNull(),
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  status: text("status").notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  ...timestamps,
+});
+
+export const leadEvents = pgTable("lead_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  leadId: uuid("lead_id").notNull(),
+  type: text("type").notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  ...timestamps,
+});
+
+export const conversations = pgTable("conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  leadId: uuid("lead_id").notNull(),
+  channel: text("channel").notNull(),
+  aiEnabled: boolean("ai_enabled").notNull().default(true),
+  status: text("status").notNull(),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+  lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
+  ...timestamps,
+});
+
+export const messages = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  conversationId: uuid("conversation_id").notNull(),
+  direction: text("direction").notNull(),
+  senderType: text("sender_type").notNull(),
+  type: text("type").notNull(),
+  content: text("content"),
+  mediaUrl: text("media_url"),
+  externalId: text("external_id"),
+  status: text("status").notNull(),
+  error: text("error"),
+  aiMetadata: jsonb("ai_metadata"),
+  template: jsonb("template").$type<{ name: string; language: string; params: string[] } | null>(),
+  ...timestamps,
+});
+
+export const webhookEvents = pgTable("webhook_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id"),
+  provider: text("provider").notNull(),
+  externalId: text("external_id").notNull(),
+  payload: jsonb("payload").notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  ...timestamps,
+});

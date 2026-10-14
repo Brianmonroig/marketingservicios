@@ -3,24 +3,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-pine text-white hover:bg-pine/90",
-        outline: "border border-line bg-white hover:bg-paper",
-      },
-      size: {
-        default: "h-10 px-4",
-      },
+// Los estilos son los botones en píldora de la referencia North Scale.
+export const buttonVariants = cva("btn", {
+  variants: {
+    variant: {
+      default: "btn-primary",
+      outline: "btn-ghost",
+      danger: "btn-danger",
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
+    size: {
+      default: "",
+      sm: "btn-sm",
+      block: "btn-block",
     },
   },
-);
+  defaultVariants: {
+    variant: "default",
+    size: "default",
+  },
+});
 
 export function Button({
   className,
@@ -30,5 +31,5 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button";
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 }

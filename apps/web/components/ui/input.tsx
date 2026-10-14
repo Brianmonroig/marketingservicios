@@ -1,14 +1,14 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "flex h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none ring-pine focus:ring-2",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <input className={cn("input", className)} {...props} />;
+}
+
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select className={cn("select", className)} {...props} />;
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={cn("textarea", className)} {...props} />;
 }

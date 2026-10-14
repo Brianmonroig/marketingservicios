@@ -3,46 +3,45 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAction } from "@/app/actions";
+import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/label";
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState(registerAction, {});
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Crear agencia</CardTitle>
-          <p className="text-sm text-stone-600">La primera persona queda como dueña del espacio.</p>
-        </CardHeader>
-        <CardContent>
-          <form action={action} className="space-y-4">
-            <Field label="Nombre de la agencia" name="agencyName" />
-            <Field label="Tu nombre" name="name" />
-            <Field label="Correo" name="email" type="email" />
-            <Field label="Contraseña" name="password" type="password" />
-            {state.error ? <p className="text-sm text-red-700">{state.error}</p> : null}
-            <Button type="submit" disabled={pending} className="w-full">
-              {pending ? "Creando..." : "Crear y enviar código"}
-            </Button>
-          </form>
-          <p className="mt-4 text-sm text-stone-600">
-            ¿Ya tienes cuenta? <Link href="/login" className="text-pine">Entrar</Link>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
-  );
-}
-
-function Field({ label, name, type = "text" }: { label: string; name: string; type?: string }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type={type} required />
-    </div>
+    <AuthShell>
+      <p className="kicker">
+        <span className="pulse" />
+        Nueva agencia
+      </p>
+      <h1>
+        Crea tu <em>agencia</em>.
+      </h1>
+      <p className="lead">La primera persona queda como dueña del espacio. Después podrás añadir a tu equipo.</p>
+      <form action={action} className="form">
+        <Field label="Nombre de la agencia" htmlFor="agencyName">
+          <Input id="agencyName" name="agencyName" required />
+        </Field>
+        <Field label="Tu nombre" htmlFor="name">
+          <Input id="name" name="name" autoComplete="name" required />
+        </Field>
+        <Field label="Correo" htmlFor="email">
+          <Input id="email" name="email" type="email" autoComplete="email" required />
+        </Field>
+        <Field label="Contraseña" htmlFor="password">
+          <Input id="password" name="password" type="password" autoComplete="new-password" required />
+        </Field>
+        {state.error ? <p className="msg-error">{state.error}</p> : null}
+        <Button type="submit" size="block" disabled={pending}>
+          {pending ? "Creando…" : "Crear y enviar código"} <span aria-hidden="true">→</span>
+        </Button>
+      </form>
+      <p className="auth-foot">
+        ¿Ya tienes cuenta? <Link href="/login">Entrar</Link>
+      </p>
+    </AuthShell>
   );
 }
