@@ -139,7 +139,6 @@ const body = {
     region: "frankfurt",
     numInstances: 1,
     healthCheckPath: "/health",
-    preDeployCommand: "./node_modules/.bin/pnpm --filter @crm/api db:migrate",
     envSpecificDetails: {
       buildCommand: "npm install -g pnpm@10.34.7 && pnpm install --frozen-lockfile && pnpm --filter @crm/shared build && pnpm --filter @crm/api lint",
       startCommand: "./node_modules/.bin/pnpm --filter @crm/api start"
