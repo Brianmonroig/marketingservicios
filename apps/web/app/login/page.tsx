@@ -22,7 +22,11 @@ function LoginForm() {
       <h1>
         <em>Entrar</em> a tu agencia.
       </h1>
-      <p className="lead">Después de la contraseña te pedimos un código nuevo al correo.</p>
+      <p className="lead">
+        El envío de correo está apagado para pruebas. Tras la contraseña te pediremos el código{" "}
+        <strong className="mono">abc123</strong>. Si aún no confirmaste el correo, ve antes a{" "}
+        <Link href="/verificar">verificar</Link>.
+      </p>
       <form action={action} className="form">
         {confirmed ? <p className="msg-ok">Correo confirmado. Ya puedes entrar.</p> : null}
         <Field label="Correo" htmlFor="email">
@@ -31,13 +35,22 @@ function LoginForm() {
         <Field label="Contraseña" htmlFor="password">
           <Input id="password" name="password" type="password" autoComplete="current-password" required />
         </Field>
-        {state.error ? <p className="msg-error">{state.error}</p> : null}
+        {state.error ? (
+          <p className="msg-error">
+            {state.error}{" "}
+            {state.error.includes("confirma") ? (
+              <Link href="/verificar">Ir a verificar</Link>
+            ) : null}
+          </p>
+        ) : null}
         <Button type="submit" size="block" disabled={pending}>
           {pending ? "Comprobando…" : "Continuar"} <span aria-hidden="true">→</span>
         </Button>
       </form>
       <p className="auth-foot">
         ¿Primera vez? <Link href="/registro">Crear agencia</Link>
+        {" · "}
+        <Link href="/verificar">Confirmar correo</Link>
       </p>
     </>
   );

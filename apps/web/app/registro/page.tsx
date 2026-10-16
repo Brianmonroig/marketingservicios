@@ -20,7 +20,10 @@ export default function RegisterPage() {
       <h1>
         Crea tu <em>agencia</em>.
       </h1>
-      <p className="lead">La primera persona queda como dueña del espacio. Después podrás añadir a tu equipo.</p>
+      <p className="lead">
+        La primera persona queda como dueña. El correo de códigos está apagado: en el siguiente paso usa{" "}
+        <strong className="mono">abc123</strong>.
+      </p>
       <form action={action} className="form">
         <Field label="Nombre de la agencia" htmlFor="agencyName">
           <Input id="agencyName" name="agencyName" required />
@@ -36,7 +39,7 @@ export default function RegisterPage() {
         </Field>
         {state.error ? <p className="msg-error">{state.error}</p> : null}
         <Button type="submit" size="block" disabled={pending}>
-          {pending ? "Creando…" : "Crear y enviar código"} <span aria-hidden="true">→</span>
+          {pending ? "Creando…" : "Crear agencia"} <span aria-hidden="true">→</span>
         </Button>
       </form>
       <p className="auth-foot">

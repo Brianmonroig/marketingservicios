@@ -255,7 +255,12 @@ export async function startLogin(
   const passwordOk = await compare(input.password, user.passwordHash);
   if (!passwordOk) throw new HttpError("Correo o contraseña incorrectos", 401);
   if (!user.emailVerifiedAt) {
-    throw new HttpError("Primero confirma el correo con el código que te enviamos", 403);
+    throw new HttpError(
+      genericAuthCode()
+        ? "Primero confirma el correo en /verificar con el código de prueba abc123"
+        : "Primero confirma el correo con el código que te enviamos",
+      403,
+    );
   }
 
   const code = createNumericCode();
