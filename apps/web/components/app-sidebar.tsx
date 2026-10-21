@@ -55,12 +55,14 @@ export function AppSidebar({
   role: string;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(true);
+  // PC: abierto con textos. Móvil: cerrado hasta hamburguesa.
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // CRM desplegado por defecto (Chat, Contactos, Tickets, Oportunidades visibles).
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ crm: true });
 
   useEffect(() => {
-    const next: Record<string, boolean> = {};
+    const next: Record<string, boolean> = { crm: true };
     for (const group of groups) {
       if (groupOpen(pathname, group)) next[group.id] = true;
     }
@@ -76,7 +78,7 @@ export function AppSidebar({
   const visible = groups.filter((group) => isManager || !group.managerOnly);
 
   function toggleGroup(id: string) {
-    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+    setOpenGroups((prev) => ({ ...prev, [id]: !(prev[id] ?? false) }));
   }
 
   return (
@@ -84,7 +86,7 @@ export function AppSidebar({
       <button
         type="button"
         className="sidebar-burger"
-        aria-label={mobileOpen || !collapsed ? "Cerrar menú" : "Abrir menú"}
+        aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
         aria-expanded={mobileOpen || !collapsed}
         onClick={() => {
           if (window.matchMedia("(max-width: 959px)").matches) {
@@ -108,7 +110,7 @@ export function AppSidebar({
 
         <nav className="sidebar-nav">
           {visible.map((group) => {
-            const expanded = openGroups[group.id] ?? groupOpen(pathname, group);
+            const expanded = openGroups[group.id] ?? group.id === "crm" || groupOpen(pathname, group);
             if (!group.children) {
               const active = group.href ? isActive(pathname, group.href, group.exact) : false;
               return (
@@ -137,23 +139,25 @@ export function AppSidebar({
                   <span className="sidebar-text">{group.label}</span>
                   <span className="sidebar-chevron" aria-hidden="true" />
                 </button>
-                <div className="sidebar-sub" hidden={!expanded && collapsed}>
-                  {group.children.map((child) => {
-                    const active = isActive(pathname, child.href, child.exact);
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className="sidebar-sublink"
-                        aria-current={active ? "page" : undefined}
-                        title={child.label}
-                        onClick={() => setMobileOpen(false)}
-                      >
-                        <span className="sidebar-text">{child.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                {expanded ? (
+                  <div className="sidebar-sub">
+                    {group.children.map((child) => {
+                      const active = isActive(pathname, child.href, child.exact);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className="sidebar-sublink"
+                          aria-current={active ? "page" : undefined}
+                          title={child.label}
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          <span className="sidebar-text">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             );
           })}
