@@ -1,5 +1,14 @@
 # Pendiente de acción manual o de fases posteriores
 
+## Navegación estilo Go High Level (en curso)
+
+- Sidebar izquierdo: CRM (Chat, Contactos, Tickets, Oportunidades) → Dashboard → Configuración.
+- Chat y Contactos usan lo ya construido (WhatsApp + leads Meta).
+- **Tickets:** UI con estados Nuevo → Abierto → Pendiente → Resuelto → Cerrado; falta API/tablas y creación desde el chat.
+- **Oportunidades:** tablero sobre etapas de contactos; falta entidad propia de oportunidad si se separa del contacto.
+- **Canales (Telegram / correo):** pantallas de configuración visibles; guardado y envío/recepción reales pendientes de autorización.
+- **Diseño:** toda UI nueva debe verse bien en PC y en móvil (sidebar hamburguesa en ambos).
+
 ## Acceso sin correo (activo ahora)
 
 - En Render, `AUTH_GENERIC_CODE=abc123`. Ese código vale para confirmar el correo, el segundo paso de entrada y **olvidé mi contraseña**. También acepta `abc 123`.

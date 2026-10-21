@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/app", label: "Resumen", exact: true, manager: false },
-  { href: "/app/leads", label: "Leads", exact: false, manager: false },
-  { href: "/app/conversaciones", label: "Conversaciones", exact: false, manager: false },
-  { href: "/app/plantillas", label: "Plantillas", exact: false, manager: false },
-  { href: "/app/integraciones", label: "Conexiones", exact: false, manager: true },
-  { href: "/app/equipo", label: "Equipo", exact: false, manager: true },
+  { href: "/app/crm/contactos", label: "Leads", exact: false, manager: false },
+  { href: "/app/crm/chat", label: "Conversaciones", exact: false, manager: false },
+  { href: "/app/configuracion/plantillas", label: "Plantillas", exact: false, manager: false },
+  { href: "/app/configuracion/integraciones", label: "Conexiones", exact: false, manager: true },
+  { href: "/app/configuracion/equipo", label: "Equipo", exact: false, manager: true },
 ];
 
 export function AppLinks({ isManager }: { isManager: boolean }) {

@@ -6,7 +6,7 @@ import { requiredEnv } from "@/lib/env";
 // Facebook devuelve aquí al usuario con un código. Se cambia por las páginas a través del API.
 export async function GET(request: NextRequest) {
   const base = requiredEnv("AUTH_URL").replace(/\/$/, "");
-  const back = (query: string) => NextResponse.redirect(`${base}/app/integraciones?${query}`);
+  const back = (query: string) => NextResponse.redirect(`${base}/app/configuracion/integraciones?${query}`);
 
   const session = await auth();
   if (!session) return NextResponse.redirect(`${base}/login`);

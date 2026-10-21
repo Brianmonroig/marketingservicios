@@ -17,7 +17,7 @@ export async function startMetaConnectionAction(): Promise<void> {
     body: JSON.stringify({ redirectUri }),
   });
   if (!result.ok || !result.data.url) {
-    redirect(`/app/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo iniciar la conexión con Facebook")}`);
+    redirect(`/app/configuracion/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo iniciar la conexión con Facebook")}`);
   }
   redirect(result.data.url);
 }
@@ -25,19 +25,19 @@ export async function startMetaConnectionAction(): Promise<void> {
 export async function activatePageAction(id: string): Promise<void> {
   const result = await apiFetch(`/integrations/${id}/activate`, { method: "POST" });
   if (!result.ok) {
-    redirect(`/app/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo activar la página")}`);
+    redirect(`/app/configuracion/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo activar la página")}`);
   }
-  revalidatePath("/app/integraciones");
-  redirect("/app/integraciones?ok=pagina");
+  revalidatePath("/app/configuracion/integraciones");
+  redirect("/app/configuracion/integraciones?ok=pagina");
 }
 
 export async function removeIntegrationAction(id: string): Promise<void> {
   const result = await apiFetch(`/integrations/${id}`, { method: "DELETE" });
   if (!result.ok) {
-    redirect(`/app/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo desconectar")}`);
+    redirect(`/app/configuracion/integraciones?error=${encodeURIComponent(result.data.error ?? "No se pudo desconectar")}`);
   }
-  revalidatePath("/app/integraciones");
-  redirect("/app/integraciones?ok=desconectado");
+  revalidatePath("/app/configuracion/integraciones");
+  redirect("/app/configuracion/integraciones?ok=desconectado");
 }
 
 export async function connectWhatsAppAction(_state: ActionState, formData: FormData): Promise<ActionState> {
@@ -50,7 +50,7 @@ export async function connectWhatsAppAction(_state: ActionState, formData: FormD
     }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo conectar el número");
-  revalidatePath("/app/integraciones");
+  revalidatePath("/app/configuracion/integraciones");
   return { ok: true, message: `Número conectado: ${result.data.displayPhoneNumber ?? ""}` };
 }
 
@@ -60,7 +60,7 @@ export async function sendTextAction(conversationId: string, _state: ActionState
     body: JSON.stringify({ type: "text", text: formData.get("text") }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo enviar el mensaje");
-  revalidatePath("/app/conversaciones");
+  revalidatePath("/app/crm/chat");
   return { ok: true };
 }
 
@@ -76,7 +76,7 @@ export async function sendTemplateAction(conversationId: string, _state: ActionS
     }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo enviar la plantilla");
-  revalidatePath("/app/conversaciones");
+  revalidatePath("/app/crm/chat");
   return { ok: true };
 }
 
@@ -86,8 +86,8 @@ export async function setOptInAction(leadId: string, _state: ActionState, formDa
     body: JSON.stringify({ optIn: formData.get("optIn") === "true", origin: formData.get("origin") }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo guardar el permiso");
-  revalidatePath(`/app/leads/${leadId}`);
-  revalidatePath("/app/leads");
+  revalidatePath(`/app/crm/contactos/${leadId}`);
+  revalidatePath("/app/crm/contactos");
   return { ok: true, message: result.data.firstContactSent ? "Permiso guardado. Se envió la plantilla de primer contacto." : "Permiso guardado." };
 }
 
@@ -107,7 +107,7 @@ export async function createTemplateAction(_state: ActionState, formData: FormDa
     }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo crear la plantilla");
-  revalidatePath("/app/plantillas");
+  revalidatePath("/app/configuracion/plantillas");
   return { ok: true, message: `Plantilla enviada a revisión de Meta (estado: ${result.data.status ?? "PENDING"}).` };
 }
 
@@ -116,7 +116,7 @@ export async function setFirstContactAction(_state: ActionState, formData: FormD
   if (!choice) {
     const cleared = await apiFetch("/whatsapp/first-contact-template", { method: "DELETE" });
     if (!cleared.ok) return fail(cleared.data.error, "No se pudo quitar la plantilla");
-    revalidatePath("/app/plantillas");
+    revalidatePath("/app/configuracion/plantillas");
     return { ok: true, message: "Primer contacto desactivado." };
   }
   const [name, language] = choice.split("|");
@@ -129,6 +129,6 @@ export async function setFirstContactAction(_state: ActionState, formData: FormD
     body: JSON.stringify({ name, language, params }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo guardar la plantilla");
-  revalidatePath("/app/plantillas");
+  revalidatePath("/app/configuracion/plantillas");
   return { ok: true, message: "Plantilla de primer contacto guardada." };
 }

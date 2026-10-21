@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
-import { Brand } from "@/components/brand";
-import { AppLinks } from "@/components/app-links";
+import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { roleLabel } from "@/lib/format";
 
@@ -11,18 +10,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isManager = session.user.role !== "agent";
 
   return (
-    <>
-      <header className="app-nav">
-        <div className="container app-nav-inner">
-          <Brand href="/app" />
-          <AppLinks isManager={isManager} />
-          <div className="app-user">
-            <div className="who">
-              <strong>{session.user.agencyName}</strong>
-              <span>
-                {session.user.name} · {roleLabel[session.user.role] ?? session.user.role}
-              </span>
-            </div>
+    <div className="app-shell">
+      <AppSidebar
+        isManager={isManager}
+        agencyName={session.user.agencyName}
+        userName={session.user.name ?? session.user.email ?? ""}
+        role={roleLabel[session.user.role] ?? session.user.role}
+      />
+      <div className="app-frame">
+        <header className="app-topbar">
+          <div className="app-topbar-inner">
+            <p className="app-topbar-title mono">{session.user.agencyName}</p>
             <form
               action={async () => {
                 "use server";
@@ -34,11 +32,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Button>
             </form>
           </div>
-        </div>
-      </header>
-      <main className="app-main">
-        <div className="container">{children}</div>
-      </main>
-    </>
+        </header>
+        <main className="app-main">
+          <div className="app-content">{children}</div>
+        </main>
+      </div>
+    </div>
   );
 }
