@@ -17,14 +17,35 @@ type FormState = { error?: string };
 type TeamState = { error?: string; ok?: boolean };
 
 async function post(path: string, body: unknown) {
-  const response = await fetch(`${requiredEnv("API_URL")}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  const data = (await response.json().catch(() => ({}))) as { error?: string; challengeId?: string };
-  if (!response.ok) return { error: data.error ?? "No se pudo completar la acción" };
+  const base = requiredEnv("API_URL").replace(/\/$/, "");
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch {
+    return {
+      error:
+        "No hay conexión con el API. En Render, en crm-web, comprueba que API_URL sea la URL de crm-api (https://crm-api-g0h1.onrender.com) y espera ~1 minuto si el servicio estaba dormido.",
+    };
+  }
+  const data = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    challengeId?: string;
+  };
+  if (!response.ok) {
+    const detail = data.error ?? data.message;
+    if (detail) return { error: detail };
+    if (response.status === 429) return { error: "Demasiados intentos. Espera un minuto y prueba otra vez." };
+    if (response.status >= 502) {
+      return { error: "El API no responde (puede estar despertando). Espera un minuto y vuelve a intentar." };
+    }
+    return { error: `No se pudo completar la acción (HTTP ${response.status}).` };
+  }
   return data;
 }
 
