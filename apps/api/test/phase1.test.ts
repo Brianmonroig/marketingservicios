@@ -240,3 +240,44 @@ test("el código genérico confirma el correo y permite entrar sin enviar email"
   delete process.env.AUTH_GENERIC_CODE;
   await app.close();
 });
+
+test("olvidé mi contraseña con código genérico cambia la clave y deja entrar", async () => {
+  if (!databaseUrl) throw new Error("Falta DATABASE_URL");
+  process.env.AUTH_GENERIC_CODE = "abc123";
+  sentMessages.length = 0;
+  const app = await buildApp({ databaseUrl, mailer: createMockMailer() });
+  const base = await listen(app);
+  const email = `reset-${randomUUID()}@example.com`;
+
+  await request(base, "/auth/register", {
+    method: "POST",
+    body: { agencyName: "Reset Co", name: "Dueño", email, password: "password-vieja" },
+  });
+  await request(base, "/auth/verify-email", { method: "POST", body: { email, code: "abc123" } });
+
+  const forgot = await request(base, "/auth/forgot-password", { method: "POST", body: { email } });
+  expect(forgot.status).toBe(202);
+  expect(sentMessages.filter((message) => message.to === email && message.purpose === "password_reset")).toHaveLength(0);
+
+  const reset = await request(base, "/auth/reset-password", {
+    method: "POST",
+    body: { email, code: "abc123", password: "password-nueva" },
+  });
+  expect(reset.status).toBe(200);
+
+  const oldLogin = await request(base, "/auth/login", {
+    method: "POST",
+    body: { email, password: "password-vieja" },
+  });
+  expect(oldLogin.status).toBe(401);
+
+  const login = await request(base, "/auth/login", {
+    method: "POST",
+    body: { email, password: "password-nueva" },
+  });
+  expect(login.status).toBe(200);
+  expect(login.data.challengeId).toBeTruthy();
+
+  delete process.env.AUTH_GENERIC_CODE;
+  await app.close();
+});

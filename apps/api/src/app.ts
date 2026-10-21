@@ -2,14 +2,28 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import {
   createUserSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resendCodeSchema,
+  resetPasswordSchema,
   verifyEmailSchema,
   verifyTwoFactorSchema,
 } from "@crm/shared";
 import { ZodError } from "zod";
-import { completeLogin, createTeamUser, HttpError, listUsers, registerAccount, resendCode, startLogin, verifyEmail } from "./accounts.js";
+import {
+  completeLogin,
+  createTeamUser,
+  genericAuthCode,
+  HttpError,
+  listUsers,
+  registerAccount,
+  requestPasswordReset,
+  resendCode,
+  resetPassword,
+  startLogin,
+  verifyEmail,
+} from "./accounts.js";
 import { createDatabase, type Database } from "./db.js";
 import type { Deps } from "./deps.js";
 import { requireManager, requireUser } from "./guard.js";
@@ -134,6 +148,23 @@ export async function buildApp(options: AppOptions) {
   app.post("/auth/resend-code", authLimit, async (request) => {
     const body = resendCodeSchema.parse(request.body);
     await resendCode(app.db, mailer, body);
+    return { ok: true };
+  });
+
+  app.post("/auth/forgot-password", authLimit, async (request, reply) => {
+    const body = forgotPasswordSchema.parse(request.body);
+    await requestPasswordReset(app.db, mailer, body);
+    return reply.code(202).send({
+      ok: true,
+      message: genericAuthCode()
+        ? "Si el correo existe, usa el código de prueba abc123 y elige una contraseña nueva."
+        : "Si el correo está registrado, te enviamos un código. Revisa la bandeja y el spam.",
+    });
+  });
+
+  app.post("/auth/reset-password", authLimit, async (request) => {
+    const body = resetPasswordSchema.parse(request.body);
+    await resetPassword(app.db, body);
     return { ok: true };
   });
 

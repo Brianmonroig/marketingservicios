@@ -49,7 +49,17 @@ export const verifyTwoFactorSchema = z.object({
 
 export const resendCodeSchema = z.object({
   email: emailSchema,
-  purpose: z.enum(["verify_email", "login_2fa"]),
+  purpose: z.enum(["verify_email", "login_2fa", "password_reset"]),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z.object({
+  email: emailSchema,
+  code: authCodeSchema,
+  password: passwordSchema,
 });
 
 export const createUserSchema = z.object({

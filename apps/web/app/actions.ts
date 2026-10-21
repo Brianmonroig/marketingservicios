@@ -51,6 +51,29 @@ export async function verifyEmailAction(_state: FormState, formData: FormData): 
   redirect("/login?confirmado=1");
 }
 
+export async function forgotPasswordAction(_state: FormState, formData: FormData): Promise<FormState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const result = await post("/auth/forgot-password", { email });
+  if (result.error) return { error: result.error };
+  const jar = await cookies();
+  jar.set("crm_pending_reset", email, pendingCookie);
+  redirect(`/login/nueva-clave?email=${encodeURIComponent(email)}`);
+}
+
+export async function resetPasswordAction(_state: FormState, formData: FormData): Promise<FormState> {
+  const jar = await cookies();
+  const fromForm = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = fromForm || jar.get("crm_pending_reset")?.value || "";
+  const result = await post("/auth/reset-password", {
+    email,
+    code: formData.get("code"),
+    password: formData.get("password"),
+  });
+  if (result.error) return { error: result.error };
+  jar.delete("crm_pending_reset");
+  redirect("/login?restablecida=1");
+}
+
 export async function loginAction(_state: FormState, formData: FormData): Promise<FormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const result = await post("/auth/login", { email, password: formData.get("password") });

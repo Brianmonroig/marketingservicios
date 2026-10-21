@@ -314,6 +314,42 @@ export async function resendCode(
   await sendCode(mailer, { to: user.email, code, purpose: input.purpose });
 }
 
+/** Siempre responde igual: no revela si el correo existe. */
+export async function requestPasswordReset(
+  db: Database,
+  mailer: Mailer,
+  input: { email: string },
+): Promise<void> {
+  const user = await findUserByEmail(db, input.email);
+  if (!user) return;
+  const code = createNumericCode();
+  await withTenant(db, user.tenantId, async (tx) => {
+    await storeCode(tx, { tenantId: user.tenantId, userId: user.id, purpose: "password_reset", code });
+  });
+  await sendCode(mailer, { to: user.email, code, purpose: "password_reset" });
+}
+
+export async function resetPassword(
+  db: Database,
+  input: { email: string; code: string; password: string },
+): Promise<void> {
+  const user = await findUserByEmail(db, input.email);
+  if (!user) throw new HttpError("El código es incorrecto o ya caducó", 401);
+  const passwordHash = await hash(input.password, 10);
+  await withTenant(db, user.tenantId, async (tx) => {
+    await consumeCode(tx, { userId: user.id, purpose: "password_reset", code: input.code });
+    await tx
+      .update(users)
+      .set({
+        passwordHash,
+        // Si aún no había confirmado el correo, al resetear con el código queda confirmado.
+        emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+  });
+}
+
 export async function listUsers(db: Database, actor: PublicUser): Promise<PublicUser[]> {
   return withTenant(db, actor.tenantId, async (tx) => {
     const name = await agencyName(tx, actor.tenantId);

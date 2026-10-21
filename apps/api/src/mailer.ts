@@ -1,4 +1,4 @@
-export type MailPurpose = "verify_email" | "login_2fa";
+export type MailPurpose = "verify_email" | "login_2fa" | "password_reset";
 
 export type Mailer = {
   sendVerificationCode(input: { to: string; code: string; purpose: MailPurpose }): Promise<void>;
@@ -7,13 +7,16 @@ export type Mailer = {
 const subjects: Record<MailPurpose, string> = {
   verify_email: "Confirma tu correo",
   login_2fa: "Tu código para entrar",
+  password_reset: "Restablece tu contraseña",
 };
 
 function message(code: string, purpose: MailPurpose): string {
   const reason =
     purpose === "verify_email"
       ? "Usa este código para confirmar que el correo es tuyo."
-      : "Usa este código para confirmar que eres tú quien entra.";
+      : purpose === "password_reset"
+        ? "Usa este código para elegir una contraseña nueva."
+        : "Usa este código para confirmar que eres tú quien entra.";
   return `${reason}\n\nCódigo: ${code}\n\nCaduca en 10 minutos. Si no has pedido este código, ignora el mensaje.`;
 }
 

@@ -2,9 +2,10 @@
 
 ## Acceso sin correo (activo ahora)
 
-- En Render, `AUTH_GENERIC_CODE=abc123`. Ese código vale para confirmar el correo y para el segundo paso de entrada. También acepta `abc 123`.
+- En Render, `AUTH_GENERIC_CODE=abc123`. Ese código vale para confirmar el correo, el segundo paso de entrada y **olvidé mi contraseña**. También acepta `abc 123`.
 - Mientras exista esa variable, **no se envía ningún correo** (Resend se ignora).
-- Es inseguro: cualquiera que sepa un correo registrado y el código genérico puede entrar al segundo paso tras la contraseña. Quitar `AUTH_GENERIC_CODE` cuando haya un envío de correo real.
+- Es inseguro: cualquiera que sepa un correo registrado y el código genérico puede restablecer la contraseña. Quitar `AUTH_GENERIC_CODE` cuando haya un envío de correo real.
+- Tras desplegar, hay que aplicar la migración `0003_password_reset.sql` (el arranque del API con `db:migrate` / el script de Render la aplica si está configurado).
 
 ## Para enviar códigos por correo de verdad
 

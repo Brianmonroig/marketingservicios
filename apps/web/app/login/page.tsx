@@ -12,6 +12,7 @@ import { Field } from "@/components/ui/label";
 function LoginForm() {
   const [state, action, pending] = useActionState(loginAction, {});
   const confirmed = useSearchParams().get("confirmado") === "1";
+  const resetOk = useSearchParams().get("restablecida") === "1";
 
   return (
     <>
@@ -29,6 +30,7 @@ function LoginForm() {
       </p>
       <form action={action} className="form">
         {confirmed ? <p className="msg-ok">Correo confirmado. Ya puedes entrar.</p> : null}
+        {resetOk ? <p className="msg-ok">Contraseña actualizada. Entra con la nueva.</p> : null}
         <Field label="Correo" htmlFor="email">
           <Input id="email" name="email" type="email" autoComplete="email" required />
         </Field>
@@ -51,6 +53,8 @@ function LoginForm() {
         ¿Primera vez? <Link href="/registro">Crear agencia</Link>
         {" · "}
         <Link href="/verificar">Confirmar correo</Link>
+        {" · "}
+        <Link href="/login/olvidar">Olvidé mi contraseña</Link>
       </p>
     </>
   );
