@@ -6,8 +6,9 @@ import { decryptToken } from "../crypto.js";
 import { withTenant } from "../db.js";
 import type { Deps } from "../deps.js";
 import { requireManager, requireUser } from "../guard.js";
+import { ensureContactFromLead } from "../crm-data.js";
 import { isWindowOpen, maybeSendFirstContact, queueOutboundMessage } from "../outbound.js";
-import { conversations, integrations, leadEvents, leads, messages, pipelineStages, tenants } from "../schema.js";
+import { contacts, conversations, integrations, leadEvents, leads, messages, opportunities, pipelineStages, tenants } from "../schema.js";
 
 async function whatsappAccount(deps: Deps, tenantId: string) {
   const row = await withTenant(deps.db, tenantId, async (tx) => {
@@ -109,12 +110,18 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
     const { id } = request.params as { id: string };
     const body = optInSchema.parse(request.body);
     await withTenant(deps.db, user.tenantId, async (tx) => {
+      const optInAt = body.optIn ? new Date() : null;
       const updated = await tx
         .update(leads)
-        .set({ whatsappOptIn: body.optIn, optInAt: body.optIn ? new Date() : null })
+        .set({ whatsappOptIn: body.optIn, optInAt })
         .where(and(eq(leads.id, id), eq(leads.tenantId, user.tenantId)))
         .returning({ id: leads.id });
       if (!updated[0]) throw new HttpError("El lead no existe", 404);
+      await ensureContactFromLead(tx, user.tenantId, id);
+      await tx
+        .update(contacts)
+        .set({ whatsappOptIn: body.optIn, optInAt, updatedAt: new Date() })
+        .where(and(eq(contacts.tenantId, user.tenantId), eq(contacts.legacyLeadId, id)));
       await tx.insert(leadEvents).values({
         tenantId: user.tenantId,
         leadId: id,
@@ -282,5 +289,97 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         .where(eq(tenants.id, user.tenantId)),
     );
     return { ok: true };
+  });
+
+  // Contactos (tabla separada; backfill desde leads en migración 0004).
+  app.get("/contacts", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const { q } = request.query as { q?: string };
+    const search = q?.trim();
+    const rows = await withTenant(deps.db, user.tenantId, (tx) =>
+      tx
+        .select({
+          id: contacts.id,
+          name: contacts.name,
+          email: contacts.email,
+          phone: contacts.phone,
+          source: contacts.source,
+          whatsappOptIn: contacts.whatsappOptIn,
+          createdAt: contacts.createdAt,
+          legacyLeadId: contacts.legacyLeadId,
+        })
+        .from(contacts)
+        .where(
+          search
+            ? and(
+                eq(contacts.tenantId, user.tenantId),
+                or(ilike(contacts.name, `%${search}%`), ilike(contacts.phone, `%${search}%`), ilike(contacts.email, `%${search}%`)),
+              )
+            : eq(contacts.tenantId, user.tenantId),
+        )
+        .orderBy(desc(contacts.createdAt))
+        .limit(200),
+    );
+    return { contacts: rows };
+  });
+
+  app.get("/contacts/:id", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const { id } = request.params as { id: string };
+    return withTenant(deps.db, user.tenantId, async (tx) => {
+      const [contact] = await tx
+        .select()
+        .from(contacts)
+        .where(and(eq(contacts.id, id), eq(contacts.tenantId, user.tenantId)))
+        .limit(1);
+      if (!contact) throw new HttpError("El contacto no existe", 404);
+      const opps = await tx
+        .select({
+          id: opportunities.id,
+          name: opportunities.name,
+          status: opportunities.status,
+          stageName: pipelineStages.name,
+          amount: opportunities.amount,
+          currency: opportunities.currency,
+        })
+        .from(opportunities)
+        .leftJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+        .where(eq(opportunities.contactId, id))
+        .orderBy(desc(opportunities.createdAt));
+      const [conversation] = await tx
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(or(eq(conversations.contactId, id), contact.legacyLeadId ? eq(conversations.leadId, contact.legacyLeadId) : sql`false`))
+        .limit(1);
+      return { contact, opportunities: opps, conversationId: conversation?.id ?? null };
+    });
+  });
+
+  app.get("/opportunities", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const rows = await withTenant(deps.db, user.tenantId, (tx) =>
+      tx
+        .select({
+          id: opportunities.id,
+          name: opportunities.name,
+          status: opportunities.status,
+          amount: opportunities.amount,
+          currency: opportunities.currency,
+          source: opportunities.source,
+          stageId: opportunities.stageId,
+          stageName: pipelineStages.name,
+          contactId: opportunities.contactId,
+          contactName: contacts.name,
+          contactPhone: contacts.phone,
+          createdAt: opportunities.createdAt,
+        })
+        .from(opportunities)
+        .leftJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+        .leftJoin(contacts, eq(contacts.id, opportunities.contactId))
+        .where(eq(opportunities.tenantId, user.tenantId))
+        .orderBy(desc(opportunities.createdAt))
+        .limit(300),
+    );
+    return { opportunities: rows };
   });
 }

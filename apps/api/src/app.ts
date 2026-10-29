@@ -35,6 +35,7 @@ import { createJobQueue } from "./queues.js";
 import { createNoopRealtime, createRedisRealtime } from "./realtime.js";
 import { registerCrmRoutes } from "./routes/crm.js";
 import { registerIntegrationRoutes } from "./routes/integrations.js";
+import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
 export type AppOptions = {
@@ -188,6 +189,7 @@ export async function buildApp(options: AppOptions) {
   await registerWebhookRoutes(app, deps);
   await registerIntegrationRoutes(app, deps);
   await registerCrmRoutes(app, deps);
+  await registerSettingsRoutes(app, deps);
 
   return app;
 }

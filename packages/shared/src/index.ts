@@ -141,3 +141,57 @@ export const firstContactTemplateSchema = z.object({
 });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+
+export const organizationSettingsSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  companyLegalName: z.string().trim().max(200).optional(),
+  language: z.string().trim().min(2).max(10).optional(),
+  timezone: z.string().trim().min(2).max(64).optional(),
+  currency: z.string().trim().min(3).max(3).optional(),
+  dateFormat: z.string().trim().max(32).optional(),
+  businessHours: z
+    .object({
+      timezone: z.string().trim().min(2).max(64).optional(),
+      weekdays: z.array(z.object({ day: z.number().int().min(0).max(6), open: z.string(), close: z.string() })).max(7).optional(),
+    })
+    .optional(),
+  holidays: z.array(z.string().trim().max(32)).max(100).optional(),
+});
+
+export const profileSettingsSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  language: z.string().trim().min(2).max(10).optional(),
+  timezone: z.string().trim().min(2).max(64).optional(),
+  notifyEmail: z.boolean().optional(),
+  notifyInbox: z.boolean().optional(),
+  currentPassword: z.string().min(1).optional(),
+  newPassword: passwordSchema.optional(),
+});
+
+export const pipelineStageSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  kind: z.enum(["open", "won", "lost", "inbox"]).default("open"),
+});
+
+export const pipelineStageReorderSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+export const channelCredentialSchema = z.discriminatedUnion("provider", [
+  z.object({
+    provider: z.literal("telegram"),
+    botToken: z.string().trim().min(10).max(200),
+    policyNotes: z.string().trim().max(2000).optional(),
+  }),
+  z.object({
+    provider: z.literal("email"),
+    apiKey: z.string().trim().min(8).max(500),
+    fromAddress: z.string().trim().min(3).max(200),
+    mailProvider: z.enum(["resend", "brevo", "other"]).default("other"),
+  }),
+  z.object({
+    provider: z.literal("google"),
+    clientId: z.string().trim().min(8).max(300),
+    clientSecret: z.string().trim().min(8).max(300),
+  }),
+]);

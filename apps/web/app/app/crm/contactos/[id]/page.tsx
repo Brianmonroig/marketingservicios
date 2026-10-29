@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { eventLabel, formatDateTime, sourceLabel } from "@/lib/format";
+import { formatDateTime, sourceLabel } from "@/lib/format";
 import { OptInForm } from "./opt-in-form";
 
-type LeadDetail = {
-  lead: {
+type ContactDetail = {
+  contact: {
     id: string;
     name: string | null;
     email: string | null;
@@ -13,32 +13,29 @@ type LeadDetail = {
     source: string | null;
     whatsappOptIn: boolean;
     optInAt: string | null;
-    campaignId: string | null;
-    adsetId: string | null;
-    adId: string | null;
     trade: string | null;
     serviceArea: string | null;
     formAnswers: Record<string, string | string[]>;
     createdAt: string;
-    stageName: string | null;
+    legacyLeadId: string | null;
   };
-  events: Array<{ id: string; type: string; payload: Record<string, unknown>; occurredAt: string }>;
+  opportunities: Array<{
+    id: string;
+    name: string | null;
+    status: string;
+    stageName: string | null;
+    amount: string | null;
+    currency: string;
+  }>;
   conversationId: string | null;
 };
 
-function describe(type: string, payload: Record<string, unknown>): string {
-  if (type === "opt_in") return `${payload.optIn ? "Permiso concedido" : "Permiso retirado"} · ${String(payload.origin ?? "")}`;
-  if (type === "message") return payload.direction === "in" ? "Mensaje recibido" : "Mensaje enviado";
-  if (type === "lead_created") return `Origen: ${sourceLabel[String(payload.source)] ?? String(payload.source ?? "")}`;
-  return "";
-}
-
-export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await apiFetch<LeadDetail>(`/leads/${id}`);
-  if (result.status === 404 || !result.data.lead) notFound();
-  const { lead, events, conversationId } = result.data;
-  const answers = Object.entries(lead.formAnswers ?? {});
+  const result = await apiFetch<ContactDetail>(`/contacts/${id}`);
+  if (result.status === 404 || !result.data.contact) notFound();
+  const { contact, opportunities, conversationId } = result.data;
+  const answers = Object.entries(contact.formAnswers ?? {});
 
   return (
     <>
@@ -46,9 +43,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <div>
           <p className="kicker">
             <span className="pulse" />
-            {sourceLabel[lead.source ?? ""] ?? lead.source ?? "Lead"} · {lead.stageName ?? "Sin etapa"}
+            {sourceLabel[contact.source ?? ""] ?? contact.source ?? "Contacto"}
           </p>
-          <h1 className="page-title">{lead.name ?? "Sin nombre"}</h1>
+          <h1 className="page-title">{contact.name ?? "Sin nombre"}</h1>
         </div>
         {conversationId ? (
           <Link className="btn btn-primary btn-sm" href={`/app/crm/chat?c=${conversationId}`}>
@@ -63,27 +60,23 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <dl className="lead-card" style={{ padding: 0 }}>
             <div>
               <dt>Teléfono</dt>
-              <dd>{lead.phone ?? "Sin teléfono válido"}</dd>
+              <dd>{contact.phone ?? "Sin teléfono válido"}</dd>
             </div>
             <div>
               <dt>Correo</dt>
-              <dd>{lead.email ?? "—"}</dd>
+              <dd>{contact.email ?? "—"}</dd>
             </div>
             <div>
               <dt>Oficio</dt>
-              <dd>{lead.trade ?? "—"}</dd>
+              <dd>{contact.trade ?? "—"}</dd>
             </div>
             <div>
               <dt>Zona de cobertura</dt>
-              <dd>{lead.serviceArea ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Campaña · conjunto · anuncio</dt>
-              <dd>{[lead.campaignId, lead.adsetId, lead.adId].map((value) => value ?? "—").join(" · ")}</dd>
+              <dd>{contact.serviceArea ?? "—"}</dd>
             </div>
             <div>
               <dt>Alta</dt>
-              <dd>{formatDateTime(lead.createdAt)}</dd>
+              <dd>{formatDateTime(contact.createdAt)}</dd>
             </div>
           </dl>
         </div>
@@ -92,12 +85,37 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <div className="panel">
             <h2>Permiso de WhatsApp</h2>
             <p className="panel-note">
-              {lead.whatsappOptIn
-                ? `Con permiso desde ${formatDateTime(lead.optInAt)}.`
+              {contact.whatsappOptIn
+                ? `Con permiso desde ${formatDateTime(contact.optInAt)}.`
                 : "Sin permiso registrado. Hace falta para enviarle una plantilla."}
             </p>
-            <OptInForm leadId={lead.id} current={lead.whatsappOptIn} />
+            {contact.legacyLeadId ? (
+              <OptInForm leadId={contact.legacyLeadId} current={contact.whatsappOptIn} />
+            ) : (
+              <p className="panel-note">Este contacto no tiene lead legado; el permiso se añadirá en una iteración posterior.</p>
+            )}
           </div>
+
+          {opportunities.length > 0 ? (
+            <div className="panel">
+              <h2>Oportunidades</h2>
+              <ul className="timeline" style={{ marginTop: ".6rem" }}>
+                {opportunities.map((opp) => (
+                  <li key={opp.id}>
+                    <span className="pill">{opp.status}</span>
+                    <span>
+                      {opp.name ?? "Sin nombre"}
+                      {opp.stageName ? ` · ${opp.stageName}` : ""}
+                      {opp.amount ? ` · ${opp.amount} ${opp.currency}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="panel-note" style={{ marginBottom: 0 }}>
+                <Link href="/app/crm/oportunidades">Ver embudo</Link>
+              </p>
+            </div>
+          ) : null}
 
           {answers.length > 0 ? (
             <div className="panel">
@@ -112,21 +130,6 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               </dl>
             </div>
           ) : null}
-
-          <div className="panel">
-            <h2>Historial</h2>
-            <ul className="timeline" style={{ marginTop: ".6rem" }}>
-              {events.map((event) => (
-                <li key={event.id}>
-                  <time>{formatDateTime(event.occurredAt)}</time>
-                  <span>
-                    <strong style={{ color: "var(--ink)", fontWeight: 500 }}>{eventLabel[event.type] ?? event.type}</strong>
-                    {describe(event.type, event.payload) ? <span style={{ color: "var(--mute)" }}> · {describe(event.type, event.payload)}</span> : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </div>
     </>

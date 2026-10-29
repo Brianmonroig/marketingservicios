@@ -1,4 +1,4 @@
-import { boolean, customType, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, customType, integer, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 const vector1536 = customType<{ data: number[] | null; driverData: string | null }>({
   dataType() {
@@ -27,6 +27,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull(),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  preferences: jsonb("preferences").notNull().default({}),
   ...timestamps,
 });
 
@@ -46,6 +47,44 @@ export const pipelineStages = pgTable("pipeline_stages", {
   tenantId: uuid("tenant_id").notNull(),
   name: text("name").notNull(),
   position: integer("position").notNull(),
+  kind: text("kind").notNull().default("open"),
+  ...timestamps,
+});
+
+export const contacts = pgTable("contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  source: text("source"),
+  whatsappOptIn: boolean("whatsapp_opt_in").notNull().default(false),
+  optInAt: timestamp("opt_in_at", { withTimezone: true }),
+  trade: text("trade"),
+  serviceArea: text("service_area"),
+  formAnswers: jsonb("form_answers").notNull().default({}),
+  assignedTo: uuid("assigned_to"),
+  legacyLeadId: uuid("legacy_lead_id"),
+  ...timestamps,
+});
+
+export const opportunities = pgTable("opportunities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  contactId: uuid("contact_id").notNull(),
+  stageId: uuid("stage_id"),
+  name: text("name"),
+  amount: numeric("amount", { precision: 18, scale: 2 }),
+  currency: text("currency").notNull().default("EUR"),
+  source: text("source"),
+  status: text("status").notNull().default("open"),
+  lossReason: text("loss_reason"),
+  assignedTo: uuid("assigned_to"),
+  campaignId: text("campaign_id"),
+  adsetId: text("adset_id"),
+  adId: text("ad_id"),
+  metaLeadId: text("meta_lead_id"),
+  legacyLeadId: uuid("legacy_lead_id"),
   ...timestamps,
 });
 
@@ -123,6 +162,7 @@ export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull(),
   leadId: uuid("lead_id").notNull(),
+  contactId: uuid("contact_id"),
   channel: text("channel").notNull(),
   aiEnabled: boolean("ai_enabled").notNull().default(true),
   status: text("status").notNull(),

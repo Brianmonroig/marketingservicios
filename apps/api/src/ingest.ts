@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
-import { findLeadByPhone, firstStageId, getOrCreateConversation, tenantCountry } from "./crm-data.js";
+import { ensureContactFromLead, findLeadByPhone, firstStageId, getOrCreateConversation, tenantCountry } from "./crm-data.js";
 import { decryptToken } from "./crypto.js";
 import { withIngest, withTenant, type Database, type Transaction } from "./db.js";
 import type { Deps } from "./deps.js";
@@ -231,6 +231,7 @@ async function processLeadgen(deps: Deps, eventId: string, payload: LeadgenPaylo
         },
         occurredAt: metaLead.createdTime ? new Date(metaLead.createdTime) : new Date(),
       });
+      await ensureContactFromLead(tx, integration.tenantId, lead.id);
     }
     await markProcessed(tx, eventId, integration.tenantId);
     return lead?.id ?? null;
@@ -299,6 +300,7 @@ async function processWhatsApp(deps: Deps, eventId: string, payload: WhatsAppPay
         leadCreated = true;
         if (lead) {
           await tx.insert(leadEvents).values({ tenantId, leadId: lead.id, type: "lead_created", payload: { source: "whatsapp" } });
+          await ensureContactFromLead(tx, tenantId, lead.id);
         }
       }
       if (!lead) throw new Error("No se pudo crear el lead");

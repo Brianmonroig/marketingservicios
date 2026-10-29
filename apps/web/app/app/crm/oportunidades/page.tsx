@@ -1,21 +1,42 @@
 import Link from "next/link";
-import { apiFetch, type LeadRow } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { sourceLabel } from "@/lib/format";
 
-export default async function OpportunitiesPage() {
-  const result = await apiFetch<{ leads: LeadRow[] }>("/leads");
-  const leads = result.data.leads ?? [];
-  const stages =
-    leads.length === 0
-      ? ["Nuevo", "Contactado", "Cualificado", "Cita Agendada", "Venta Cerrada"]
-      : [...new Set(leads.map((lead) => lead.stageName ?? "Sin etapa"))];
+type Opportunity = {
+  id: string;
+  name: string | null;
+  status: string;
+  amount: string | null;
+  currency: string;
+  source: string | null;
+  stageId: string | null;
+  stageName: string | null;
+  contactId: string;
+  contactName: string | null;
+  contactPhone: string | null;
+};
 
-  const grouped = new Map<string, LeadRow[]>();
-  for (const stage of stages) grouped.set(stage, []);
-  for (const lead of leads) {
-    const key = lead.stageName ?? "Sin etapa";
+type Stage = { id: string; name: string; position: number; kind: string };
+
+export default async function OpportunitiesPage() {
+  const [oppsResult, stagesResult] = await Promise.all([
+    apiFetch<{ opportunities: Opportunity[] }>("/opportunities"),
+    apiFetch<{ stages: Stage[] }>("/settings/pipelines"),
+  ]);
+  const opportunities = oppsResult.data.opportunities ?? [];
+  const stages = stagesResult.data.stages ?? [];
+
+  const columnOrder =
+    stages.length > 0
+      ? stages.map((stage) => stage.name)
+      : [...new Set(opportunities.map((item) => item.stageName ?? "Sin etapa"))];
+
+  const grouped = new Map<string, Opportunity[]>();
+  for (const name of columnOrder) grouped.set(name, []);
+  for (const item of opportunities) {
+    const key = item.stageName ?? "Sin etapa";
     if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(lead);
+    grouped.get(key)!.push(item);
   }
 
   return (
@@ -33,11 +54,11 @@ export default async function OpportunitiesPage() {
       </div>
 
       <p className="panel-note">
-        Embudo de oportunidades ligado a <Link href="/app/crm/contactos">Contactos</Link>. Cada tarjeta es un contacto en
-        su etapa actual (misma metodología de pipeline).
+        Embudo separado de <Link href="/app/crm/contactos">Contactos</Link>. Las etapas se editan en{" "}
+        <Link href="/app/configuracion/pipelines">Configuración → Pipelines</Link>.
       </p>
 
-      {!result.ok ? <p className="msg-error">{result.data.error ?? "No se pudo cargar el pipeline"}</p> : null}
+      {!oppsResult.ok ? <p className="msg-error">{oppsResult.data.error ?? "No se pudo cargar el pipeline"}</p> : null}
 
       <div className="board">
         {[...grouped.entries()].map(([stage, cards]) => (
@@ -50,12 +71,14 @@ export default async function OpportunitiesPage() {
               <div className="board-empty">Vacío</div>
             ) : (
               <ul className="board-cards">
-                {cards.map((lead) => (
-                  <li key={lead.id}>
-                    <Link href={`/app/crm/contactos/${lead.id}`} className="board-card">
-                      <strong>{lead.name ?? lead.phone ?? "Sin nombre"}</strong>
-                      <span>{sourceLabel[lead.source ?? ""] ?? lead.source ?? "—"}</span>
-                      <span className="mono">{lead.phone ?? lead.email ?? ""}</span>
+                {cards.map((item) => (
+                  <li key={item.id}>
+                    <Link href={`/app/crm/contactos/${item.contactId}`} className="board-card">
+                      <strong>{item.name ?? item.contactName ?? item.contactPhone ?? "Sin nombre"}</strong>
+                      <span>{sourceLabel[item.source ?? ""] ?? item.source ?? "—"}</span>
+                      <span className="mono">
+                        {item.amount ? `${item.amount} ${item.currency}` : (item.contactPhone ?? "")}
+                      </span>
                     </Link>
                   </li>
                 ))}

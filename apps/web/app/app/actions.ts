@@ -86,8 +86,8 @@ export async function setOptInAction(leadId: string, _state: ActionState, formDa
     body: JSON.stringify({ optIn: formData.get("optIn") === "true", origin: formData.get("origin") }),
   });
   if (!result.ok) return fail(result.data.error, "No se pudo guardar el permiso");
-  revalidatePath(`/app/crm/contactos/${leadId}`);
-  revalidatePath("/app/crm/contactos");
+  revalidatePath("/app/crm/contactos", "layout");
+  revalidatePath("/app/crm/oportunidades");
   return { ok: true, message: result.data.firstContactSent ? "Permiso guardado. Se envió la plantilla de primer contacto." : "Permiso guardado." };
 }
 
@@ -131,4 +131,89 @@ export async function setFirstContactAction(_state: ActionState, formData: FormD
   if (!result.ok) return fail(result.data.error, "No se pudo guardar la plantilla");
   revalidatePath("/app/configuracion/plantillas");
   return { ok: true, message: "Plantilla de primer contacto guardada." };
+}
+
+export async function saveOrganizationAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch("/settings/organization", {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      companyLegalName: formData.get("companyLegalName") || undefined,
+      language: formData.get("language"),
+      timezone: formData.get("timezone"),
+      currency: String(formData.get("currency") ?? "").toUpperCase(),
+      dateFormat: formData.get("dateFormat"),
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo guardar la organización");
+  revalidatePath("/app/configuracion/organizacion");
+  return { ok: true, message: "Organización actualizada." };
+}
+
+export async function saveProfileAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const result = await apiFetch("/settings/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      language: formData.get("language"),
+      timezone: formData.get("timezone"),
+      notifyEmail: formData.get("notifyEmail") === "true",
+      notifyInbox: formData.get("notifyInbox") === "true",
+      ...(newPassword ? { currentPassword, newPassword } : {}),
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo guardar el perfil");
+  revalidatePath("/app/configuracion/perfil");
+  return { ok: true, message: "Perfil actualizado." };
+}
+
+export async function createStageAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch("/settings/pipelines/stages", {
+    method: "POST",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      kind: formData.get("kind") || "open",
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo crear la etapa");
+  revalidatePath("/app/configuracion/pipelines");
+  revalidatePath("/app/crm/oportunidades");
+  return { ok: true };
+}
+
+export async function saveCredentialAction(
+  provider: "telegram" | "email" | "google",
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  let body: Record<string, unknown>;
+  if (provider === "telegram") {
+    body = {
+      provider: "telegram",
+      botToken: formData.get("botToken"),
+      policyNotes: formData.get("policyNotes") || undefined,
+    };
+  } else if (provider === "email") {
+    body = {
+      provider: "email",
+      apiKey: formData.get("apiKey"),
+      fromAddress: formData.get("fromAddress"),
+      mailProvider: formData.get("mailProvider") || "other",
+    };
+  } else {
+    body = {
+      provider: "google",
+      clientId: formData.get("clientId"),
+      clientSecret: formData.get("clientSecret"),
+    };
+  }
+  const result = await apiFetch("/settings/credentials", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudieron guardar las credenciales");
+  revalidatePath("/app/configuracion/credenciales");
+  return { ok: true };
 }
