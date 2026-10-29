@@ -4,7 +4,7 @@
 
 - Sidebar izquierdo: CRM (Chat, Contactos, Tickets, Oportunidades) → Dashboard → Configuración.
 - Chat y Contactos usan lo ya construido (WhatsApp + leads Meta).
-- **Tickets:** UI con estados Nuevo → Abierto → Pendiente → Resuelto → Cerrado; falta API/tablas y creación desde el chat.
+- **Tickets:** persistidos (`tickets` + CRUD). Falta crear ticket automáticamente desde el chat con un clic.
 - **Oportunidades:** entidad `opportunities` + Kanban en CRM; falta drag-and-drop y edición de importe/etapa desde la tarjeta.
 - **Credenciales (Telegram / correo / Google):** se guardan cifradas en Configuración → Credenciales. **Envío/recepción reales bloqueados** hasta acción explícita de administrador.
 - **Migración:** aplicar `0004_config_contacts_opportunities.sql` en cada entorno (arranque `db:migrate` / Render).

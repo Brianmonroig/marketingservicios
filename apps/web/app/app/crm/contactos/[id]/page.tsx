@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, sourceLabel } from "@/lib/format";
+import { ContactEditForm } from "./contact-edit-form";
 import { OptInForm } from "./opt-in-form";
 
 type ContactDetail = {
@@ -27,6 +28,7 @@ type ContactDetail = {
     amount: string | null;
     currency: string;
   }>;
+  tickets?: Array<{ id: string; title: string; status: string; priority: string }>;
   conversationId: string | null;
 };
 
@@ -35,6 +37,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   const result = await apiFetch<ContactDetail>(`/contacts/${id}`);
   if (result.status === 404 || !result.data.contact) notFound();
   const { contact, opportunities, conversationId } = result.data;
+  const tickets = result.data.tickets ?? [];
   const answers = Object.entries(contact.formAnswers ?? {});
 
   return (
@@ -44,41 +47,66 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           <p className="kicker">
             <span className="pulse" />
             {sourceLabel[contact.source ?? ""] ?? contact.source ?? "Contacto"}
+            {contact.source === "demo" ? " · datos de ejemplo" : ""}
           </p>
           <h1 className="page-title">{contact.name ?? "Sin nombre"}</h1>
         </div>
-        {conversationId ? (
-          <Link className="btn btn-primary btn-sm" href={`/app/crm/chat?c=${conversationId}`}>
-            Abrir conversación <span aria-hidden="true">→</span>
+        <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+          {conversationId ? (
+            <Link className="btn btn-primary btn-sm" href={`/app/crm/chat?c=${conversationId}`}>
+              Abrir chat <span aria-hidden="true">→</span>
+            </Link>
+          ) : null}
+          <Link className="btn btn-sm" href="/app/crm/oportunidades">
+            Oportunidades
           </Link>
-        ) : null}
+          <Link className="btn btn-sm" href="/app/crm/tickets">
+            Tickets
+          </Link>
+        </div>
       </div>
 
       <div className="two-col">
-        <div className="panel">
-          <h2>Datos</h2>
-          <dl className="lead-card" style={{ padding: 0 }}>
-            <div>
-              <dt>Teléfono</dt>
-              <dd>{contact.phone ?? "Sin teléfono válido"}</dd>
-            </div>
-            <div>
-              <dt>Correo</dt>
-              <dd>{contact.email ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Oficio</dt>
-              <dd>{contact.trade ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Zona de cobertura</dt>
-              <dd>{contact.serviceArea ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Alta</dt>
-              <dd>{formatDateTime(contact.createdAt)}</dd>
-            </div>
-          </dl>
+        <div>
+          <div className="panel">
+            <h2>Editar contacto</h2>
+            <ContactEditForm
+              contactId={contact.id}
+              initial={{
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                trade: contact.trade,
+                serviceArea: contact.serviceArea,
+              }}
+            />
+          </div>
+
+          <div className="panel">
+            <h2>Datos</h2>
+            <dl className="lead-card" style={{ padding: 0 }}>
+              <div>
+                <dt>Teléfono</dt>
+                <dd>{contact.phone ?? "Sin teléfono válido"}</dd>
+              </div>
+              <div>
+                <dt>Correo</dt>
+                <dd>{contact.email ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Oficio</dt>
+                <dd>{contact.trade ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Zona de cobertura</dt>
+                <dd>{contact.serviceArea ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Alta</dt>
+                <dd>{formatDateTime(contact.createdAt)}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
 
         <div>
@@ -92,7 +120,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
             {contact.legacyLeadId ? (
               <OptInForm leadId={contact.legacyLeadId} current={contact.whatsappOptIn} />
             ) : (
-              <p className="panel-note">Este contacto no tiene lead legado; el permiso se añadirá en una iteración posterior.</p>
+              <p className="panel-note">Este contacto no tiene lead legado.</p>
             )}
           </div>
 
@@ -113,6 +141,25 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
               </ul>
               <p className="panel-note" style={{ marginBottom: 0 }}>
                 <Link href="/app/crm/oportunidades">Ver embudo</Link>
+              </p>
+            </div>
+          ) : null}
+
+          {tickets.length > 0 ? (
+            <div className="panel">
+              <h2>Tickets</h2>
+              <ul className="timeline" style={{ marginTop: ".6rem" }}>
+                {tickets.map((ticket) => (
+                  <li key={ticket.id}>
+                    <span className="pill">{ticket.status}</span>
+                    <span>
+                      {ticket.title} · {ticket.priority}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="panel-note" style={{ marginBottom: 0 }}>
+                <Link href="/app/crm/tickets">Ver tablero</Link>
               </p>
             </div>
           ) : null}

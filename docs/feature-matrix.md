@@ -22,9 +22,10 @@ Fuentes: `K` = capacidad descrita en docs Kommo (evidencia funcional, no API nue
 | CFG-14 | P | Métricas y atribución | Config → Métricas | — | — | — | — | ui-sin-backend | Stub |
 | CFG-15 | P | Plan y capacidades reales | Config → Plan | `GET /settings/plan` | `tenants.plan` | owner/admin | manual | implementada | Sin billing inventado |
 | CRM-01 | E | Chat WhatsApp | CRM → Chat | `/conversations*` | conversations/messages | all | phase3 | implementada | Media no descargada |
-| CRM-02 | E/P | Contactos | CRM → Contactos | `GET /contacts*` | `contacts` | all | manual | implementada | Empresas/M2N pendiente |
-| CRM-03 | P | Tickets | CRM → Tickets | — | — | — | — | ui-sin-backend | — |
-| CRM-04 | E/P | Oportunidades Kanban | CRM → Oportunidades | `GET /opportunities` | `opportunities` | all | manual | implementada | Drag-and-drop pendiente |
+| CRM-02 | E/P | Contactos | CRM → Contactos | `GET/POST/PATCH /contacts*` | `contacts` | all | manual | implementada | Empresas/M2N pendiente |
+| CRM-03 | P | Tickets | CRM → Tickets | `GET/POST/PATCH /tickets` | `tickets` | all | manual | implementada | Crear desde chat con un clic pendiente |
+| CRM-04 | E/P | Oportunidades Kanban | CRM → Oportunidades | `GET/POST/PATCH /opportunities` | `opportunities` | all | manual | implementada | Drag-and-drop pendiente |
+| CRM-05 | P | Demo seed integral | Contactos → Cargar ejemplo | `POST /crm/demo-seed` | contacts/opps/tickets/chat demo | owner/admin | manual | implementada | Sin envío WhatsApp |
 | META-01 | E/V | Lead Ads webhook+OAuth | Integraciones | `/webhooks/meta` | leads+contacts | manager | phase2 mock | implementada-pendiente-conexion | App Review / docs Meta |
 | META-02 | V | Messenger/IG/Ads/CAPI | — | — | — | — | — | ausente | Validar Graph actual |
 | WA-01 | E/V | WhatsApp Cloud API inbox/send/templates | Integraciones+Chat+Plantillas | `/webhooks/whatsapp` | messages… | — | phase3 mock | implementada-pendiente-conexion | Embedded Signup ausente |

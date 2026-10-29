@@ -1,5 +1,12 @@
 # Registro de implementación CRM
 
+## 2026-10-29 (fase demo CRM integral)
+
+- Migración `0005_tickets_demo.sql` + CRUD contactos/oportunidades/tickets.
+- `POST /crm/demo-seed`: ejemplo completo (2 contactos, 4 oportunidades, 4 tickets, chat `channel=demo`).
+- Chat demo guarda mensajes locales sin WhatsApp; UI con altas/edición y enlaces cruzados.
+- Postgres del stack: Docker Compose (`pgvector/pg16`) + Render Postgres 16.
+
 ## 2026-10-29 (fase B · Config + contactos/oportunidades)
 
 Confirmaciones del usuario: (1) Config primero con persistencia real; (2) roles owner/admin/agent; (3) separar contactos y oportunidades; (4) bloques de credenciales en Config; (5) sin envíos reales sin acción explícita de admin.

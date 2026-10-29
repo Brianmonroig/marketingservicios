@@ -26,6 +26,8 @@ export const roleLabel: Record<string, string> = {
 export const sourceLabel: Record<string, string> = {
   meta_lead_ads: "Meta",
   whatsapp: "WhatsApp",
+  demo: "Ejemplo",
+  manual: "Manual",
 };
 
 export const messageStatusLabel: Record<string, string> = {

@@ -183,6 +183,115 @@ export async function createStageAction(_state: ActionState, formData: FormData)
   return { ok: true };
 }
 
+export async function seedDemoCrmAction(): Promise<void> {
+  const result = await apiFetch<{ alreadySeeded?: boolean }>("/crm/demo-seed", { method: "POST" });
+  if (!result.ok) {
+    redirect(`/app/crm/contactos?error=${encodeURIComponent(result.data.error ?? "No se pudo cargar el ejemplo")}`);
+  }
+  revalidatePath("/app/crm", "layout");
+  redirect(result.data.alreadySeeded ? "/app/crm/contactos?ok=demo-ya" : "/app/crm/contactos?ok=demo");
+}
+
+export async function createContactAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch<{ contact?: { id: string } }>("/contacts", {
+    method: "POST",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      email: formData.get("email") || null,
+      phone: formData.get("phone") || null,
+      trade: formData.get("trade") || null,
+      serviceArea: formData.get("serviceArea") || null,
+      whatsappOptIn: formData.get("whatsappOptIn") === "true",
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo crear el contacto");
+  revalidatePath("/app/crm/contactos", "layout");
+  revalidatePath("/app/crm/oportunidades");
+  if (result.data.contact?.id) redirect(`/app/crm/contactos/${result.data.contact.id}`);
+  return { ok: true };
+}
+
+export async function updateContactAction(contactId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch(`/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      email: formData.get("email") || null,
+      phone: formData.get("phone") || null,
+      trade: formData.get("trade") || null,
+      serviceArea: formData.get("serviceArea") || null,
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo guardar el contacto");
+  revalidatePath("/app/crm/contactos", "layout");
+  return { ok: true, message: "Contacto actualizado." };
+}
+
+export async function createOpportunityAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch("/opportunities", {
+    method: "POST",
+    body: JSON.stringify({
+      contactId: formData.get("contactId"),
+      name: formData.get("name"),
+      stageId: formData.get("stageId") || undefined,
+      amount: formData.get("amount") || null,
+      currency: formData.get("currency") || "EUR",
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo crear la oportunidad");
+  revalidatePath("/app/crm/oportunidades");
+  revalidatePath("/app/crm/contactos", "layout");
+  return { ok: true, message: "Oportunidad creada." };
+}
+
+export async function updateOpportunityAction(opportunityId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
+  const amount = String(formData.get("amount") ?? "").trim();
+  const result = await apiFetch(`/opportunities/${opportunityId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      stageId: formData.get("stageId") || null,
+      amount: amount || null,
+      status: formData.get("status") || undefined,
+      name: formData.get("name") || undefined,
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo guardar la oportunidad");
+  revalidatePath("/app/crm/oportunidades");
+  return { ok: true };
+}
+
+export async function createTicketAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch("/tickets", {
+    method: "POST",
+    body: JSON.stringify({
+      contactId: formData.get("contactId"),
+      title: formData.get("title"),
+      description: formData.get("description") || null,
+      status: formData.get("status") || "nuevo",
+      priority: formData.get("priority") || "normal",
+      conversationId: formData.get("conversationId") || null,
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo crear el ticket");
+  revalidatePath("/app/crm/tickets");
+  revalidatePath("/app/crm/contactos", "layout");
+  return { ok: true, message: "Ticket creado." };
+}
+
+export async function updateTicketAction(ticketId: string, _state: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await apiFetch(`/tickets/${ticketId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: formData.get("status") || undefined,
+      priority: formData.get("priority") || undefined,
+      title: formData.get("title") || undefined,
+    }),
+  });
+  if (!result.ok) return fail(result.data.error, "No se pudo actualizar el ticket");
+  revalidatePath("/app/crm/tickets");
+  return { ok: true };
+}
+
 export async function saveCredentialAction(
   provider: "telegram" | "email" | "google",
   _state: ActionState,

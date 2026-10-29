@@ -195,3 +195,33 @@ export const channelCredentialSchema = z.discriminatedUnion("provider", [
     clientSecret: z.string().trim().min(8).max(300),
   }),
 ]);
+
+export const contactWriteSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional().nullable(),
+  email: z.union([z.string().trim().email().max(200), z.literal(""), z.null()]).optional(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  trade: z.string().trim().max(120).optional().nullable(),
+  serviceArea: z.string().trim().max(120).optional().nullable(),
+  whatsappOptIn: z.boolean().optional(),
+});
+
+export const opportunityWriteSchema = z.object({
+  contactId: z.string().uuid().optional(),
+  name: z.string().trim().min(1).max(160).optional(),
+  stageId: z.string().uuid().optional().nullable(),
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/).optional().nullable(),
+  currency: z.string().trim().min(3).max(3).optional(),
+  status: z.enum(["open", "won", "lost"]).optional(),
+  source: z.string().trim().max(80).optional().nullable(),
+});
+
+export const ticketStatuses = ["nuevo", "abierto", "pendiente", "resuelto", "cerrado"] as const;
+
+export const ticketWriteSchema = z.object({
+  contactId: z.string().uuid().optional(),
+  conversationId: z.string().uuid().optional().nullable(),
+  title: z.string().trim().min(2).max(200).optional(),
+  description: z.string().trim().max(4000).optional().nullable(),
+  status: z.enum(ticketStatuses).optional(),
+  priority: z.enum(["low", "normal", "high"]).optional(),
+});

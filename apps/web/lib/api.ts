@@ -46,6 +46,8 @@ export type IntegrationRow = {
 export type ConversationRow = {
   id: string;
   status: string;
+  channel?: string;
+  contactId?: string | null;
   leadId: string;
   leadName: string | null;
   leadPhone: string | null;

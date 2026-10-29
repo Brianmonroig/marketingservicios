@@ -6,8 +6,27 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { ThreadFeed } from "@/components/thread-feed";
 
 type Thread = {
-  conversation: { id: string; status: string; aiEnabled: boolean; lastInboundAt: string | null; windowOpen: boolean };
-  lead: { id: string; name: string | null; email: string | null; phone: string | null; source: string | null; whatsappOptIn: boolean; trade: string | null; serviceArea: string | null; formAnswers: Record<string, string | string[]>; stageName: string | null };
+  conversation: {
+    id: string;
+    status: string;
+    channel?: string;
+    contactId?: string | null;
+    aiEnabled: boolean;
+    lastInboundAt: string | null;
+    windowOpen: boolean;
+  };
+  lead: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    source: string | null;
+    whatsappOptIn: boolean;
+    trade: string | null;
+    serviceArea: string | null;
+    formAnswers: Record<string, string | string[]>;
+    stageName: string | null;
+  };
   messages: MessageRow[];
 };
 
@@ -18,12 +37,16 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const selectedId = c ?? conversations[0]?.id;
   const thread = selectedId ? await apiFetch<Thread>(`/conversations/${selectedId}`) : null;
   const detail = thread?.ok ? thread.data : null;
+  const isDemo = detail?.conversation.channel === "demo";
 
-  // Las plantillas solo hacen falta cuando el texto libre no está disponible.
   const templates =
-    detail && !detail.conversation.windowOpen
+    detail && !detail.conversation.windowOpen && !isDemo
       ? await apiFetch<{ templates: TemplateRow[] }>("/whatsapp/templates")
       : null;
+
+  const contactHref = detail?.conversation.contactId
+    ? `/app/crm/contactos/${detail.conversation.contactId}`
+    : null;
 
   return (
     <>
@@ -41,15 +64,25 @@ export default async function ConversationsPage({ searchParams }: { searchParams
       </div>
 
       {conversations.length === 0 ? (
-        <div className="panel empty">Todavía no hay conversaciones. Aparecerán cuando un lead escriba por WhatsApp o le envíes una plantilla.</div>
+        <div className="panel empty">
+          Todavía no hay conversaciones. Carga el ejemplo CRM desde Contactos o espera un mensaje de WhatsApp real.
+        </div>
       ) : (
         <div className="inbox">
           <div className="inbox-col">
             <div className="inbox-list">
               {conversations.map((conversation) => (
-                <Link key={conversation.id} href={`/app/crm/chat?c=${conversation.id}`} className="inbox-item" aria-current={conversation.id === selectedId}>
+                <Link
+                  key={conversation.id}
+                  href={`/app/crm/chat?c=${conversation.id}`}
+                  className="inbox-item"
+                  aria-current={conversation.id === selectedId}
+                >
                   <span className="top">
-                    <span className="name">{conversation.leadName ?? conversation.leadPhone ?? "Sin nombre"}</span>
+                    <span className="name">
+                      {conversation.leadName ?? conversation.leadPhone ?? "Sin nombre"}
+                      {conversation.channel === "demo" ? " · ejemplo" : ""}
+                    </span>
                     <span className="when">{formatTime(conversation.lastMessageAt)}</span>
                   </span>
                   <span className="preview">
@@ -71,11 +104,20 @@ export default async function ConversationsPage({ searchParams }: { searchParams
                       {detail.lead.phone}
                     </div>
                   </div>
-                  <span className={`pill ${detail.conversation.windowOpen ? "pill-ok" : "pill-warn"}`}>
-                    {detail.conversation.windowOpen ? "Ventana de 24 h abierta" : "Ventana de 24 h cerrada"}
+                  <span className={`pill ${isDemo ? "pill-warn" : detail.conversation.windowOpen ? "pill-ok" : "pill-warn"}`}>
+                    {isDemo
+                      ? "Chat local (ejemplo)"
+                      : detail.conversation.windowOpen
+                        ? "Ventana de 24 h abierta"
+                        : "Ventana de 24 h cerrada"}
                   </span>
                 </div>
                 <ThreadFeed messages={detail.messages} />
+                {isDemo ? (
+                  <p className="panel-note" style={{ margin: "0 .8rem" }}>
+                    Mensajes guardados solo en el CRM. No se envían a WhatsApp.
+                  </p>
+                ) : null}
                 <Composer
                   conversationId={detail.conversation.id}
                   windowOpen={detail.conversation.windowOpen}
@@ -87,7 +129,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
               <div className="inbox-col">
                 <div className="lead-card">
-                  <strong style={{ fontSize: "1.05rem" }}>Ficha del lead</strong>
+                  <strong style={{ fontSize: "1.05rem" }}>Ficha del contacto</strong>
                   <dl>
                     <div>
                       <dt>Origen</dt>
@@ -110,7 +152,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
                       <dd>{detail.lead.whatsappOptIn ? "Con permiso" : "Sin permiso"}</dd>
                     </div>
                     <div>
-                      <dt>Último mensaje del lead</dt>
+                      <dt>Último mensaje entrante</dt>
                       <dd>{formatDateTime(detail.conversation.lastInboundAt)}</dd>
                     </div>
                     {Object.entries(detail.lead.formAnswers ?? {}).map(([key, value]) => (
@@ -120,8 +162,16 @@ export default async function ConversationsPage({ searchParams }: { searchParams
                       </div>
                     ))}
                   </dl>
-                  <Link className="btn btn-ghost btn-sm" href={`/app/crm/contactos/${detail.lead.id}`}>
-                    Ver ficha completa
+                  {contactHref ? (
+                    <Link className="btn btn-ghost btn-sm" href={contactHref}>
+                      Ver ficha completa
+                    </Link>
+                  ) : null}
+                  <Link className="btn btn-ghost btn-sm" href="/app/crm/tickets">
+                    Ver tickets
+                  </Link>
+                  <Link className="btn btn-ghost btn-sm" href="/app/crm/oportunidades">
+                    Ver oportunidades
                   </Link>
                 </div>
               </div>

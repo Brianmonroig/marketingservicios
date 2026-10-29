@@ -158,6 +158,20 @@ export const leadEvents = pgTable("lead_events", {
   ...timestamps,
 });
 
+export const tickets = pgTable("tickets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull(),
+  contactId: uuid("contact_id").notNull(),
+  conversationId: uuid("conversation_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("nuevo"),
+  priority: text("priority").notNull().default("normal"),
+  assigneeId: uuid("assignee_id"),
+  source: text("source"),
+  ...timestamps,
+});
+
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull(),

@@ -1,14 +1,34 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { createTemplateSchema, firstContactTemplateSchema, optInSchema, sendMessageSchema } from "@crm/shared";
+import {
+  contactWriteSchema,
+  createTemplateSchema,
+  firstContactTemplateSchema,
+  optInSchema,
+  opportunityWriteSchema,
+  sendMessageSchema,
+  ticketWriteSchema,
+} from "@crm/shared";
 import { HttpError } from "../accounts.js";
+import { ensureContactFromLead, firstStageId } from "../crm-data.js";
 import { decryptToken } from "../crypto.js";
 import { withTenant } from "../db.js";
+import { seedDemoCrm } from "../demo-seed.js";
 import type { Deps } from "../deps.js";
 import { requireManager, requireUser } from "../guard.js";
-import { ensureContactFromLead } from "../crm-data.js";
 import { isWindowOpen, maybeSendFirstContact, queueOutboundMessage } from "../outbound.js";
-import { contacts, conversations, integrations, leadEvents, leads, messages, opportunities, pipelineStages, tenants } from "../schema.js";
+import {
+  contacts,
+  conversations,
+  integrations,
+  leadEvents,
+  leads,
+  messages,
+  opportunities,
+  pipelineStages,
+  tenants,
+  tickets,
+} from "../schema.js";
 
 async function whatsappAccount(deps: Deps, tenantId: string) {
   const row = await withTenant(deps.db, tenantId, async (tx) => {
@@ -137,8 +157,9 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
     const user = await requireUser(request.headers.authorization);
     const result = await withTenant(deps.db, user.tenantId, (tx) =>
       tx.execute(sql`
-        SELECT c.id, c.status, c.ai_enabled AS "aiEnabled", c.last_message_at AS "lastMessageAt",
-               c.last_inbound_at AS "lastInboundAt", l.id AS "leadId", l.name AS "leadName", l.phone AS "leadPhone",
+        SELECT c.id, c.status, c.channel, c.ai_enabled AS "aiEnabled", c.last_message_at AS "lastMessageAt",
+               c.last_inbound_at AS "lastInboundAt", c.contact_id AS "contactId",
+               l.id AS "leadId", l.name AS "leadName", l.phone AS "leadPhone",
                (SELECT m.content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS "lastContent",
                (SELECT m.direction FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS "lastDirection"
         FROM conversations c
@@ -147,11 +168,11 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         LIMIT 100
       `),
     );
-    const rows = result.rows as Array<{ lastInboundAt: Date | string | null } & Record<string, unknown>>;
+    const rows = result.rows as Array<{ lastInboundAt: Date | string | null; channel: string } & Record<string, unknown>>;
     return {
       conversations: rows.map((row) => ({
         ...row,
-        windowOpen: isWindowOpen(row.lastInboundAt ? new Date(row.lastInboundAt) : null),
+        windowOpen: row.channel === "demo" ? true : isWindowOpen(row.lastInboundAt ? new Date(row.lastInboundAt) : null),
       })),
     };
   });
@@ -179,6 +200,15 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
         .where(eq(leads.id, conversation.leadId))
         .limit(1);
+      let contactId = conversation.contactId;
+      if (!contactId && lead) {
+        const [linked] = await tx
+          .select({ id: contacts.id })
+          .from(contacts)
+          .where(and(eq(contacts.tenantId, user.tenantId), eq(contacts.legacyLeadId, lead.id)))
+          .limit(1);
+        contactId = linked?.id ?? null;
+      }
       const thread = await tx
         .select({
           id: messages.id,
@@ -194,13 +224,16 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         .where(eq(messages.conversationId, id))
         .orderBy(asc(messages.createdAt))
         .limit(500);
+      const isDemo = conversation.channel === "demo";
       return {
         conversation: {
           id: conversation.id,
           status: conversation.status,
+          channel: conversation.channel,
           aiEnabled: conversation.aiEnabled,
           lastInboundAt: conversation.lastInboundAt,
-          windowOpen: isWindowOpen(conversation.lastInboundAt),
+          contactId,
+          windowOpen: isDemo ? true : isWindowOpen(conversation.lastInboundAt),
         },
         lead,
         messages: thread,
@@ -212,6 +245,47 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
     const user = await requireUser(request.headers.authorization);
     const { id } = request.params as { id: string };
     const body = sendMessageSchema.parse(request.body);
+
+    const channel = await withTenant(deps.db, user.tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ channel: conversations.channel })
+        .from(conversations)
+        .where(and(eq(conversations.id, id), eq(conversations.tenantId, user.tenantId)))
+        .limit(1);
+      if (!row) throw new HttpError("La conversación no existe", 404);
+      return row.channel;
+    });
+
+    if (channel === "demo") {
+      if (body.type !== "text") throw new HttpError("En el chat de ejemplo solo se admite texto", 400);
+      const result = await withTenant(deps.db, user.tenantId, async (tx) => {
+        const [message] = await tx
+          .insert(messages)
+          .values({
+            tenantId: user.tenantId,
+            conversationId: id,
+            direction: "out",
+            senderType: "user",
+            type: "text",
+            content: body.text,
+            status: "delivered",
+          })
+          .returning({ id: messages.id });
+        await tx
+          .update(conversations)
+          .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+          .where(eq(conversations.id, id));
+        return { messageId: message!.id, conversationId: id };
+      });
+      await deps.realtime.publish(user.tenantId, {
+        type: "message",
+        conversationId: id,
+        messageId: result.messageId,
+        direction: "out",
+      });
+      return reply.code(201).send(result);
+    }
+
     const result = await queueOutboundMessage(deps, user.tenantId, { conversationId: id }, body);
     return reply.code(202).send(result);
   });
@@ -291,6 +365,12 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
     return { ok: true };
   });
 
+  app.post("/crm/demo-seed", async (request, reply) => {
+    const user = await requireManager(request.headers.authorization);
+    const result = await withTenant(deps.db, user.tenantId, (tx) => seedDemoCrm(tx, user.tenantId, user.id));
+    return reply.code(result.alreadySeeded ? 200 : 201).send({ ok: true, ...result });
+  });
+
   // Contactos (tabla separada; backfill desde leads en migración 0004).
   app.get("/contacts", async (request) => {
     const user = await requireUser(request.headers.authorization);
@@ -323,6 +403,54 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
     return { contacts: rows };
   });
 
+  app.post("/contacts", async (request, reply) => {
+    const user = await requireUser(request.headers.authorization);
+    const body = contactWriteSchema.parse(request.body);
+    const email = body.email === "" || body.email == null ? null : body.email;
+    const created = await withTenant(deps.db, user.tenantId, async (tx) => {
+      const stageId = await firstStageId(tx, user.tenantId);
+      const [lead] = await tx
+        .insert(leads)
+        .values({
+          tenantId: user.tenantId,
+          name: body.name ?? null,
+          email,
+          phone: body.phone ?? null,
+          stageId,
+          source: "manual",
+          whatsappOptIn: body.whatsappOptIn ?? false,
+          optInAt: body.whatsappOptIn ? new Date() : null,
+          trade: body.trade ?? null,
+          serviceArea: body.serviceArea ?? null,
+        })
+        .returning();
+      if (!lead) throw new Error("No se pudo crear el lead espejo");
+      await tx.insert(leadEvents).values({
+        tenantId: user.tenantId,
+        leadId: lead.id,
+        type: "lead_created",
+        payload: { source: "manual", by: user.id },
+      });
+      const contact = await ensureContactFromLead(tx, user.tenantId, lead.id);
+      if (!contact) throw new Error("No se pudo crear el contacto");
+      if (body.name || body.trade || body.serviceArea) {
+        const [updated] = await tx
+          .update(contacts)
+          .set({
+            name: body.name ?? contact.name,
+            trade: body.trade ?? contact.trade,
+            serviceArea: body.serviceArea ?? contact.serviceArea,
+            updatedAt: new Date(),
+          })
+          .where(eq(contacts.id, contact.id))
+          .returning();
+        return updated ?? contact;
+      }
+      return contact;
+    });
+    return reply.code(201).send({ contact: created });
+  });
+
   app.get("/contacts/:id", async (request) => {
     const user = await requireUser(request.headers.authorization);
     const { id } = request.params as { id: string };
@@ -346,12 +474,64 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         .leftJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
         .where(eq(opportunities.contactId, id))
         .orderBy(desc(opportunities.createdAt));
+      const ticketRows = await tx
+        .select({
+          id: tickets.id,
+          title: tickets.title,
+          status: tickets.status,
+          priority: tickets.priority,
+        })
+        .from(tickets)
+        .where(eq(tickets.contactId, id))
+        .orderBy(desc(tickets.createdAt));
       const [conversation] = await tx
-        .select({ id: conversations.id })
+        .select({ id: conversations.id, channel: conversations.channel })
         .from(conversations)
         .where(or(eq(conversations.contactId, id), contact.legacyLeadId ? eq(conversations.leadId, contact.legacyLeadId) : sql`false`))
+        .orderBy(desc(conversations.lastMessageAt))
         .limit(1);
-      return { contact, opportunities: opps, conversationId: conversation?.id ?? null };
+      return { contact, opportunities: opps, tickets: ticketRows, conversationId: conversation?.id ?? null };
+    });
+  });
+
+  app.patch("/contacts/:id", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const { id } = request.params as { id: string };
+    const body = contactWriteSchema.parse(request.body);
+    const email = body.email === "" ? null : body.email;
+    return withTenant(deps.db, user.tenantId, async (tx) => {
+      const [updated] = await tx
+        .update(contacts)
+        .set({
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(email !== undefined ? { email } : {}),
+          ...(body.phone !== undefined ? { phone: body.phone } : {}),
+          ...(body.trade !== undefined ? { trade: body.trade } : {}),
+          ...(body.serviceArea !== undefined ? { serviceArea: body.serviceArea } : {}),
+          ...(body.whatsappOptIn !== undefined
+            ? { whatsappOptIn: body.whatsappOptIn, optInAt: body.whatsappOptIn ? new Date() : null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(contacts.id, id), eq(contacts.tenantId, user.tenantId)))
+        .returning();
+      if (!updated) throw new HttpError("El contacto no existe", 404);
+      if (updated.legacyLeadId) {
+        await tx
+          .update(leads)
+          .set({
+            name: updated.name,
+            email: updated.email,
+            phone: updated.phone,
+            trade: updated.trade,
+            serviceArea: updated.serviceArea,
+            whatsappOptIn: updated.whatsappOptIn,
+            optInAt: updated.optInAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(leads.id, updated.legacyLeadId));
+      }
+      return { contact: updated };
     });
   });
 
@@ -381,5 +561,136 @@ export async function registerCrmRoutes(app: FastifyInstance, deps: Deps) {
         .limit(300),
     );
     return { opportunities: rows };
+  });
+
+  app.post("/opportunities", async (request, reply) => {
+    const user = await requireUser(request.headers.authorization);
+    const body = opportunityWriteSchema
+      .refine((value) => Boolean(value.contactId && value.name), { message: "Indica contacto y nombre" })
+      .parse(request.body);
+    const created = await withTenant(deps.db, user.tenantId, async (tx) => {
+      const [contact] = await tx
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, body.contactId!), eq(contacts.tenantId, user.tenantId)))
+        .limit(1);
+      if (!contact) throw new HttpError("El contacto no existe", 404);
+      const stageId = body.stageId ?? (await firstStageId(tx, user.tenantId));
+      const [row] = await tx
+        .insert(opportunities)
+        .values({
+          tenantId: user.tenantId,
+          contactId: contact.id,
+          stageId,
+          name: body.name!,
+          amount: body.amount ?? null,
+          currency: body.currency ?? "EUR",
+          status: body.status ?? "open",
+          source: body.source ?? "manual",
+        })
+        .returning();
+      return row;
+    });
+    return reply.code(201).send({ opportunity: created });
+  });
+
+  app.patch("/opportunities/:id", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const { id } = request.params as { id: string };
+    const body = opportunityWriteSchema.parse(request.body);
+    return withTenant(deps.db, user.tenantId, async (tx) => {
+      const [updated] = await tx
+        .update(opportunities)
+        .set({
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.stageId !== undefined ? { stageId: body.stageId } : {}),
+          ...(body.amount !== undefined ? { amount: body.amount } : {}),
+          ...(body.currency !== undefined ? { currency: body.currency } : {}),
+          ...(body.status !== undefined ? { status: body.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(opportunities.id, id), eq(opportunities.tenantId, user.tenantId)))
+        .returning();
+      if (!updated) throw new HttpError("La oportunidad no existe", 404);
+      return { opportunity: updated };
+    });
+  });
+
+  app.get("/tickets", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const rows = await withTenant(deps.db, user.tenantId, (tx) =>
+      tx
+        .select({
+          id: tickets.id,
+          title: tickets.title,
+          description: tickets.description,
+          status: tickets.status,
+          priority: tickets.priority,
+          source: tickets.source,
+          contactId: tickets.contactId,
+          contactName: contacts.name,
+          conversationId: tickets.conversationId,
+          createdAt: tickets.createdAt,
+        })
+        .from(tickets)
+        .leftJoin(contacts, eq(contacts.id, tickets.contactId))
+        .where(eq(tickets.tenantId, user.tenantId))
+        .orderBy(desc(tickets.createdAt))
+        .limit(300),
+    );
+    return { tickets: rows };
+  });
+
+  app.post("/tickets", async (request, reply) => {
+    const user = await requireUser(request.headers.authorization);
+    const body = ticketWriteSchema
+      .refine((value) => Boolean(value.contactId && value.title), { message: "Indica contacto y título" })
+      .parse(request.body);
+    const created = await withTenant(deps.db, user.tenantId, async (tx) => {
+      const [contact] = await tx
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, body.contactId!), eq(contacts.tenantId, user.tenantId)))
+        .limit(1);
+      if (!contact) throw new HttpError("El contacto no existe", 404);
+      const [row] = await tx
+        .insert(tickets)
+        .values({
+          tenantId: user.tenantId,
+          contactId: contact.id,
+          conversationId: body.conversationId ?? null,
+          title: body.title!,
+          description: body.description ?? null,
+          status: body.status ?? "nuevo",
+          priority: body.priority ?? "normal",
+          assigneeId: user.id,
+          source: "manual",
+        })
+        .returning();
+      return row;
+    });
+    return reply.code(201).send({ ticket: created });
+  });
+
+  app.patch("/tickets/:id", async (request) => {
+    const user = await requireUser(request.headers.authorization);
+    const { id } = request.params as { id: string };
+    const body = ticketWriteSchema.parse(request.body);
+    return withTenant(deps.db, user.tenantId, async (tx) => {
+      const [updated] = await tx
+        .update(tickets)
+        .set({
+          ...(body.title !== undefined ? { title: body.title } : {}),
+          ...(body.description !== undefined ? { description: body.description } : {}),
+          ...(body.status !== undefined ? { status: body.status } : {}),
+          ...(body.priority !== undefined ? { priority: body.priority } : {}),
+          ...(body.conversationId !== undefined ? { conversationId: body.conversationId } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(tickets.id, id), eq(tickets.tenantId, user.tenantId)))
+        .returning();
+      if (!updated) throw new HttpError("El ticket no existe", 404);
+      return { ticket: updated };
+    });
   });
 }
