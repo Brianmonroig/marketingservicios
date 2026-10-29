@@ -120,7 +120,7 @@ export function AppSidebar({
 
         <nav className="sidebar-nav">
           {visible.map((group) => {
-            const expanded = openGroups[group.id] ?? group.id === "crm" || groupOpen(pathname, group);
+            const expanded = openGroups[group.id] ?? (group.id === "crm" || groupOpen(pathname, group));
             if (!group.children) {
               const active = group.href ? isActive(pathname, group.href, group.exact) : false;
               return (
