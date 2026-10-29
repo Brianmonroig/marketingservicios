@@ -65,10 +65,8 @@ export function AppSidebar({
   role: string;
 }) {
   const pathname = usePathname();
-  // PC: abierto con textos. Móvil: cerrado hasta hamburguesa.
-  const [collapsed, setCollapsed] = useState(false);
+  // Escritorio: sidebar fijo abierto (no se colapsa). Móvil: cajón con hamburguesa.
   const [mobileOpen, setMobileOpen] = useState(false);
-  // CRM desplegado por defecto (Chat, Contactos, Tickets, Oportunidades visibles).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ crm: true });
 
   useEffect(() => {
@@ -97,14 +95,8 @@ export function AppSidebar({
         type="button"
         className="sidebar-burger"
         aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-        aria-expanded={mobileOpen || !collapsed}
-        onClick={() => {
-          if (window.matchMedia("(max-width: 959px)").matches) {
-            setMobileOpen((value) => !value);
-          } else {
-            setCollapsed((value) => !value);
-          }
-        }}
+        aria-expanded={mobileOpen}
+        onClick={() => setMobileOpen((value) => !value)}
       >
         <span />
         <span />
@@ -113,7 +105,7 @@ export function AppSidebar({
 
       {mobileOpen ? <button type="button" className="sidebar-backdrop" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} /> : null}
 
-      <aside className={`app-sidebar${collapsed ? " is-collapsed" : ""}${mobileOpen ? " is-mobile-open" : ""}`} aria-label="Navegación principal">
+      <aside className={`app-sidebar${mobileOpen ? " is-mobile-open" : ""}`} aria-label="Navegación principal">
         <div className="sidebar-brand">
           <Brand href="/app/crm/chat" />
         </div>
