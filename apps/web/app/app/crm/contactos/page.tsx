@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { CrmDemoBanner } from "@/components/crm-demo-banner";
 import { apiFetch } from "@/lib/api";
 import { formatDate, sourceLabel } from "@/lib/format";
 import { ContactCreateForm } from "./contact-create-form";
-import { DemoSeedButton } from "./demo-seed-button";
 
 type ContactRow = {
   id: string;
@@ -39,18 +39,22 @@ export default async function ContactsPage({
             Tus <em>contactos</em>.
           </h1>
         </div>
-        <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap", alignItems: "end" }}>
-          {isManager ? <DemoSeedButton /> : null}
-          <form className="field" style={{ minWidth: 220 }} action="/app/crm/contactos">
-            <label htmlFor="q">Buscar</label>
-            <input className="input" id="q" name="q" defaultValue={q ?? ""} placeholder="Nombre, teléfono o correo" />
-          </form>
-        </div>
+        <form className="field" style={{ minWidth: 220 }} action="/app/crm/contactos">
+          <label htmlFor="q">Buscar</label>
+          <input className="input" id="q" name="q" defaultValue={q ?? ""} placeholder="Nombre, teléfono o correo" />
+        </form>
       </div>
 
-      {ok === "demo" ? <p className="msg-ok">Ejemplo CRM cargado (contactos, oportunidades, tickets y chat local).</p> : null}
-      {ok === "demo-ya" ? <p className="msg-ok">El ejemplo ya estaba cargado en esta agencia.</p> : null}
+      {ok === "demo" || ok === "demo-ya" ? (
+        <p className="msg-ok">
+          {ok === "demo-ya"
+            ? "El ejemplo ya estaba cargado. Abre un contacto con origen «Ejemplo»."
+            : "Ejemplo CRM listo. Revisa también Oportunidades, Tickets y Chat."}
+        </p>
+      ) : null}
       {error ? <p className="msg-error">{error}</p> : null}
+
+      {contacts.length === 0 ? <CrmDemoBanner isManager={isManager} /> : null}
 
       <div className="split" style={{ marginBottom: "1.2rem" }}>
         <div className="panel">
@@ -60,20 +64,16 @@ export default async function ContactsPage({
         <div className="panel">
           <h2>Cómo se articula</h2>
           <p className="panel-note">
-            Un contacto puede tener <Link href="/app/crm/oportunidades">oportunidades</Link>,{" "}
-            <Link href="/app/crm/tickets">tickets</Link> y un hilo en el <Link href="/app/crm/chat">Chat</Link>. El botón
-            «Cargar ejemplo CRM» rellena un caso completo sin conectar Meta ni WhatsApp.
+            Desde la ficha entras a <Link href="/app/crm/oportunidades">oportunidades</Link>,{" "}
+            <Link href="/app/crm/tickets">tickets</Link> y <Link href="/app/crm/chat">chat</Link>.
           </p>
+          {contacts.length > 0 && isManager ? <CrmDemoBanner isManager={isManager} compact /> : null}
         </div>
       </div>
 
       {result.ok ? (
         contacts.length === 0 ? (
-          <div className="panel empty">
-            {q
-              ? "Ningún contacto coincide con la búsqueda."
-              : "Todavía no hay contactos. Crea uno o carga el ejemplo CRM."}
-          </div>
+          <div className="panel empty">{q ? "Ningún contacto coincide con la búsqueda." : "Sin contactos todavía."}</div>
         ) : (
           <div className="table-wrap">
             <table className="table">

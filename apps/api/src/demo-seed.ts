@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { HttpError } from "./accounts.js";
 import type { Transaction } from "./db.js";
 import { contacts, conversations, leads, messages, opportunities, pipelineStages, tenants, tickets } from "./schema.js";
@@ -22,8 +22,23 @@ export async function seedDemoCrm(tx: Transaction, tenantId: string, actorUserId
   const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
   if (!tenant) throw new HttpError("No encontramos la agencia", 404);
   const settings = asObject(tenant.settings);
-  if (settings.demoSeededAt) {
-    return { alreadySeeded: true as const, seededAt: String(settings.demoSeededAt) };
+  const [existingDemo] = await tx
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(and(eq(contacts.tenantId, tenantId), eq(contacts.source, "demo")))
+    .limit(1);
+  if (existingDemo || settings.demoSeededAt) {
+    const [demoChat] = await tx
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(and(eq(conversations.tenantId, tenantId), eq(conversations.channel, "demo")))
+      .limit(1);
+    return {
+      alreadySeeded: true as const,
+      seededAt: String(settings.demoSeededAt ?? ""),
+      conversationId: demoChat?.id,
+      contactIds: existingDemo ? [existingDemo.id] : [],
+    };
   }
 
   const stageRows = await stages(tx, tenantId);

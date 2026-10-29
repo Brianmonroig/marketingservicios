@@ -184,12 +184,18 @@ export async function createStageAction(_state: ActionState, formData: FormData)
 }
 
 export async function seedDemoCrmAction(): Promise<void> {
-  const result = await apiFetch<{ alreadySeeded?: boolean }>("/crm/demo-seed", { method: "POST" });
+  const result = await apiFetch<{ alreadySeeded?: boolean; conversationId?: string }>("/crm/demo-seed", {
+    method: "POST",
+  });
   if (!result.ok) {
-    redirect(`/app/crm/contactos?error=${encodeURIComponent(result.data.error ?? "No se pudo cargar el ejemplo")}`);
+    redirect(`/app/dashboard?error=${encodeURIComponent(result.data.error ?? "No se pudo cargar el ejemplo")}`);
   }
-  revalidatePath("/app/crm", "layout");
-  redirect(result.data.alreadySeeded ? "/app/crm/contactos?ok=demo-ya" : "/app/crm/contactos?ok=demo");
+  revalidatePath("/app", "layout");
+  if (result.data.alreadySeeded) {
+    redirect("/app/crm/contactos?ok=demo-ya");
+  }
+  const chat = result.data.conversationId ? `/app/crm/chat?c=${result.data.conversationId}&ok=demo` : "/app/crm/chat?ok=demo";
+  redirect(chat);
 }
 
 export async function createContactAction(_state: ActionState, formData: FormData): Promise<ActionState> {

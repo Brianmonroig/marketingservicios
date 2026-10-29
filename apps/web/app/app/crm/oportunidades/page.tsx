@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { auth } from "@/auth";
+import { CrmDemoBanner } from "@/components/crm-demo-banner";
 import { apiFetch } from "@/lib/api";
 import { sourceLabel } from "@/lib/format";
 import { OpportunityCreateForm, OpportunityEditForm } from "./opportunity-forms";
@@ -21,6 +23,8 @@ type Stage = { id: string; name: string; position: number; kind: string };
 type Contact = { id: string; name: string | null; phone: string | null };
 
 export default async function OpportunitiesPage() {
+  const session = await auth();
+  const isManager = session?.user.role === "owner" || session?.user.role === "admin";
   const [oppsResult, stagesResult, contactsResult] = await Promise.all([
     apiFetch<{ opportunities: Opportunity[] }>("/opportunities"),
     apiFetch<{ stages: Stage[] }>("/settings/pipelines"),
@@ -61,6 +65,8 @@ export default async function OpportunitiesPage() {
         Embudo separado de <Link href="/app/crm/contactos">Contactos</Link>. Etapas en{" "}
         <Link href="/app/configuracion/pipelines">Configuración → Pipelines</Link>.
       </p>
+
+      {opportunities.length === 0 ? <CrmDemoBanner isManager={isManager} /> : null}
 
       <div className="panel" style={{ marginBottom: "1.2rem", maxWidth: 720 }}>
         <h2>Nueva oportunidad</h2>

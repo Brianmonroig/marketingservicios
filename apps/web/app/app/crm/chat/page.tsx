@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { Composer } from "./composer-switch";
+import { CrmDemoBanner } from "@/components/crm-demo-banner";
 import { apiFetch, type ConversationRow, type MessageRow, type TemplateRow } from "@/lib/api";
 import { formatDateTime, formatTime, sourceLabel } from "@/lib/format";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -30,8 +32,10 @@ type Thread = {
   messages: MessageRow[];
 };
 
-export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
-  const { c } = await searchParams;
+export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ c?: string; ok?: string }> }) {
+  const session = await auth();
+  const isManager = session?.user.role === "owner" || session?.user.role === "admin";
+  const { c, ok } = await searchParams;
   const list = await apiFetch<{ conversations: ConversationRow[] }>("/conversations");
   const conversations = list.data.conversations ?? [];
   const selectedId = c ?? conversations[0]?.id;
@@ -63,10 +67,15 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         <LiveRefresh />
       </div>
 
+      {ok === "demo" ? (
+        <p className="msg-ok">Ejemplo cargado. Este hilo es local (no WhatsApp). Desde la ficha lateral abre contacto, tickets y oportunidades.</p>
+      ) : null}
+
       {conversations.length === 0 ? (
-        <div className="panel empty">
-          Todavía no hay conversaciones. Carga el ejemplo CRM desde Contactos o espera un mensaje de WhatsApp real.
-        </div>
+        <>
+          <CrmDemoBanner isManager={isManager} />
+          <div className="panel empty">Todavía no hay conversaciones. Carga el ejemplo o espera un WhatsApp real.</div>
+        </>
       ) : (
         <div className="inbox">
           <div className="inbox-col">

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { auth } from "@/auth";
+import { CrmDemoBanner } from "@/components/crm-demo-banner";
 import { apiFetch } from "@/lib/api";
 import { sourceLabel } from "@/lib/format";
 import { TicketCreateForm, TicketStatusForm } from "./ticket-forms";
@@ -26,6 +28,8 @@ type Ticket = {
 type Contact = { id: string; name: string | null; phone: string | null };
 
 export default async function TicketsPage() {
+  const session = await auth();
+  const isManager = session?.user.role === "owner" || session?.user.role === "admin";
   const [ticketsResult, contactsResult] = await Promise.all([
     apiFetch<{ tickets: Ticket[] }>("/tickets"),
     apiFetch<{ contacts: Contact[] }>("/contacts"),
@@ -58,6 +62,8 @@ export default async function TicketsPage() {
         Casos ligados a <Link href="/app/crm/contactos">contactos</Link> y, si aplica, al{" "}
         <Link href="/app/crm/chat">Chat</Link>. Persistidos en base de datos.
       </p>
+
+      {tickets.length === 0 ? <CrmDemoBanner isManager={isManager} /> : null}
 
       <div className="panel" style={{ marginBottom: "1.2rem", maxWidth: 720 }}>
         <h2>Nuevo ticket</h2>
